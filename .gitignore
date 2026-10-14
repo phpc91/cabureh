@@ -147,3 +147,15 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# --- projeto ---
+# dados gerados pela coleta (o workflow publica direto no Pages)
+web/public/data/*
+!web/public/data/.gitkeep
+etl/.cache/
+node_modules/
+web/dist/
+__pycache__/
+.pytest_cache/
+*.pyc
+.DS_Store

@@ -1,0 +1,83 @@
+name: Atualizar dados e publicar
+
+on:
+  schedule:
+    - cron: "17 9 * * *"   # todo dia às 06:17 em Brasília
+  workflow_dispatch:         # botão "Run workflow" na aba Actions
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: etl/requirements-dev.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Restaurar downloads anteriores
+        uses: actions/cache@v4
+        with:
+          path: etl/.cache
+          key: camara-${{ github.run_id }}
+          restore-keys: camara-
+
+      - name: Instalar dependências da coleta
+        run: pip install -r etl/requirements-dev.txt
+
+      - name: Testes da coleta
+        working-directory: etl
+        run: python -m pytest -q
+
+      - name: Coletar e agregar dados da Câmara
+        working-directory: etl
+        run: python -m camara_etl build --cache .cache --out ../web/public/data
+
+      - name: Resumo da coleta
+        run: |
+          echo '### Resumo da coleta' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat web/public/data/meta.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Construir o site
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

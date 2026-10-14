@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Presença na Câmara</title>
+  <meta name="description" content="Presença, votações, pauta, gastos e trabalho dos deputados federais, a partir dos Dados Abertos da Câmara dos Deputados.">
+  <meta property="og:title" content="Presença na Câmara">
+  <meta property="og:description" content="Presença, votações, gastos e trabalho dos deputados federais, atualizados todos os dias a partir dos dados abertos da Câmara.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='17' width='6' height='12' rx='1.5' fill='%232a78d6'/%3E%3Crect x='13' y='9' width='6' height='20' rx='1.5' fill='%232a78d6'/%3E%3Crect x='23' y='4' width='6' height='25' rx='1.5' fill='%232a78d6'/%3E%3C/svg%3E">
+</head>
+<body>
+<div id="dash-root">
+<div class="cp">
+  <header class="cp-head">
+    <h1 class="cp-title">Presença na Câmara</h1>
+    <p class="cp-takeaway" id="resumo" data-source="presenca">—</p>
+    <p class="cp-fonte" id="fonte" data-source="pauta">Fonte: <a class="cp-link" href="https://dadosabertos.camara.leg.br" target="_blank" rel="noopener">Dados Abertos da Câmara dos Deputados</a>. <span class="cp-fonte-data"></span> Os números medem atividade registrada; veja a aba Como ler antes de tirar conclusões.</p>
+  </header>
+
+  <div class="cp-filters" id="filtros">
+    <div class="cp-field">
+      <span class="cp-label" id="lab-anos">Período</span>
+      <div class="cp-chips" role="group" aria-labelledby="lab-anos" data-source="presenca"></div>
+    </div>
+    <label class="cp-field"><span class="cp-label">Partido</span>
+      <select class="cp-select cp-f-partido" data-source="presenca"><option value="">Todos</option></select>
+    </label>
+    <label class="cp-field"><span class="cp-label">Estado</span>
+      <select class="cp-select cp-f-uf" data-source="presenca"><option value="">Todos</option></select>
+    </label>
+    <label class="cp-field"><span class="cp-label">Rankings consideram quem esteve em exercício em</span>
+      <select class="cp-select cp-f-min">
+        <option value="0">qualquer número de sessões</option>
+        <option value="10">ao menos 10% das sessões</option>
+        <option value="25">ao menos 25% das sessões</option>
+        <option value="50">ao menos 50% das sessões</option>
+        <option value="75">ao menos 75% das sessões</option>
+      </select>
+    </label>
+    <button type="button" class="cp-picked" hidden></button>
+    <button type="button" class="cp-ghost cp-reset">Limpar filtros</button>
+  </div>
+
+  <section class="cp-kpis" id="numeros">
+    <div class="cp-kpi"><div class="cp-kpi-l">Presença nas sessões</div><div class="cp-kpi-v dash-skeleton" data-k="pres" data-source="presenca">—</div><div class="cp-kpi-s" data-k="presS"></div></div>
+    <div class="cp-kpi"><div class="cp-kpi-l">Ausências</div><div class="cp-kpi-v dash-skeleton" data-k="aus" data-source="presenca">—</div><div class="cp-kpi-s" data-k="ausS"></div></div>
+    <div class="cp-kpi"><div class="cp-kpi-l">Participação em votações nominais</div><div class="cp-kpi-v dash-skeleton" data-k="vot" data-source="presenca">—</div><div class="cp-kpi-s" data-k="votS"></div></div>
+    <div class="cp-kpi"><div class="cp-kpi-l">Abstenções</div><div class="cp-kpi-v dash-skeleton" data-k="abs" data-source="presenca">—</div><div class="cp-kpi-s" data-k="absS"></div></div>
+    <div class="cp-kpi"><div class="cp-kpi-l">Projetos apresentados</div><div class="cp-kpi-v dash-skeleton" data-k="proj" data-source="presenca">—</div><div class="cp-kpi-s" data-k="projS"></div></div>
+    <div class="cp-kpi"><div class="cp-kpi-l">Cota parlamentar</div><div class="cp-kpi-v dash-skeleton" data-k="cota">—</div><div class="cp-kpi-s" data-k="cotaS"></div></div>
+  </section>
+
+  <div class="cp-tabs" role="tablist" aria-label="Seções">
+    <button type="button" class="cp-tab" role="tab" data-tab="presenca">Presença</button>
+    <button type="button" class="cp-tab" role="tab" data-tab="votacoes">Votações</button>
+    <button type="button" class="cp-tab" role="tab" data-tab="pauta">Pauta</button>
+    <button type="button" class="cp-tab" role="tab" data-tab="projetos">Projetos</button>
+    <button type="button" class="cp-tab" role="tab" data-tab="gastos">Gastos</button>
+    <button type="button" class="cp-tab" role="tab" data-tab="trabalho">Trabalho</button>
+    <button type="button" class="cp-tab" role="tab" data-tab="deputados">Deputados</button>
+    <button type="button" class="cp-tab" role="tab" data-tab="partidos">Partidos</button>
+    <button type="button" class="cp-tab" role="tab" data-tab="metodo">Como ler</button>
+  </div>
+
+  <section class="cp-page" id="presenca" role="tabpanel">
+    <div class="cp-card" id="presenca-mes" data-source="presenca">
+      <h2 class="cp-card-h">Presença por mês</h2>
+      <p class="cp-card-n">Presenças registradas como parcela das sessões deliberativas do Plenário em cada mês. Meses sem sessão ficam em branco.</p>
+      <div class="cp-legend" data-leg="mes" hidden></div>
+      <div class="cp-chart dash-skeleton" data-c="mes"></div>
+    </div>
+    <div class="cp-card" id="distribuicao" data-source="presenca">
+      <h2 class="cp-card-h">Distribuição da presença</h2>
+      <p class="cp-card-n" data-n="dist"></p>
+      <div class="cp-legend" data-leg="dist" hidden></div>
+      <div class="cp-chart dash-skeleton" data-c="dist"></div>
+    </div>
+    <div class="cp-row">
+      <span class="cp-card-n">Clique em um partido ou em um deputado para ver só os números dele.</span>
+      <div class="cp-seg" role="group" aria-label="Medir ausências por">
+        <button type="button" class="cp-seg-b" data-modo="taxa">% das sessões</button>
+        <button type="button" class="cp-seg-b" data-modo="total">Número de ausências</button>
+      </div>
+    </div>
+    <div class="cp-grid">
+      <div class="cp-card" id="ausencias-partido" data-source="presenca">
+        <h2 class="cp-card-h">Ausências por partido</h2>
+        <p class="cp-card-n" data-n="partidos">Partidos com bancada média de ao menos um deputado no período.</p>
+        <div class="cp-box dash-skeleton" data-c="partidos"></div>
+      </div>
+      <div class="cp-card" id="mais-ausentes" data-source="presenca">
+        <h2 class="cp-card-h">Deputados com mais ausências</h2>
+        <p class="cp-card-n" data-n="ausentes"></p>
+        <div class="cp-box dash-skeleton" data-c="ausentes"></div>
+      </div>
+      <div class="cp-card" id="mais-presentes" data-source="presenca">
+        <h2 class="cp-card-h">Deputados mais presentes</h2>
+        <p class="cp-card-n" data-n="presentes"></p>
+        <div class="cp-box dash-skeleton" data-c="presentes"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cp-page" id="votacoes" role="tabpanel" hidden>
+    <div class="cp-card" id="votos-partido" data-source="presenca">
+      <h2 class="cp-card-h">Como cada partido votou</h2>
+      <p class="cp-card-n">Divisão das votações nominais do Plenário ocorridas enquanto os deputados do partido estavam em exercício. À direita, a parcela em que houve voto registrado.</p>
+      <div class="cp-legend" data-leg="votos"></div>
+      <div class="cp-box dash-skeleton" data-c="votosPartido"></div>
+    </div>
+    <div class="cp-grid cp-grid-2">
+      <div class="cp-card" id="mais-votou" data-source="presenca">
+        <h2 class="cp-card-h">Quem mais votou</h2>
+        <p class="cp-card-n">Votos registrados em votações nominais do Plenário (sim, não, abstenção, obstrução e outros registros).</p>
+        <div class="cp-box dash-skeleton" data-c="maisVotou"></div>
+      </div>
+      <div class="cp-card" id="menos-votou" data-source="presenca">
+        <h2 class="cp-card-h">Quem menos participou das votações</h2>
+        <p class="cp-card-n" data-n="menosVotou"></p>
+        <div class="cp-box dash-skeleton" data-c="menosVotou"></div>
+      </div>
+      <div class="cp-card" id="mais-abstencoes" data-source="presenca">
+        <h2 class="cp-card-h">Quem mais se absteve</h2>
+        <p class="cp-card-n">Votos de abstenção e a parcela que representam entre os votos do deputado.</p>
+        <div class="cp-box dash-skeleton" data-c="abst"></div>
+      </div>
+      <div class="cp-card" id="mais-obstrucoes" data-source="presenca">
+        <h2 class="cp-card-h">Quem mais obstruiu</h2>
+        <p class="cp-card-n">Registros de obstrução, quando o deputado está presente mas se recusa a votar para negar quórum.</p>
+        <div class="cp-box dash-skeleton" data-c="obst"></div>
+      </div>
+    </div>
+      <h2 class="cp-sec-h" id="obstrucao">Obstrução e alinhamento</h2>
+    <p class="cp-sec-n">Obstrução é o registro de quem está presente mas não quer dar quórum à votação, em geral por decisão da liderança do partido. Aqui ela aparece separada do comportamento individual, junto com o quanto cada deputado acompanha a própria bancada e o governo.</p>
+    <div class="cp-card" id="obstrucao-mes" data-source="pauta partidos_votacao alinhamento">
+      <h2 class="cp-card-h">Obstruções por mês</h2>
+      <p class="cp-card-n">Registros de obstrução em votações nominais do Plenário, por partido do deputado na data do voto.</p>
+      <div class="cp-legend" data-leg="obsMes"></div>
+      <div class="cp-chart dash-skeleton" data-c="obsMes"></div>
+    </div>
+    <div class="cp-grid cp-grid-2">
+      <div class="cp-card" id="obstrucao-partido" data-source="pauta partidos_votacao alinhamento">
+        <h2 class="cp-card-h">De onde vem a obstrução</h2>
+        <p class="cp-card-n">Orientada: a liderança do partido, da federação ou do bloco orientou obstruir. Com a bancada: sem orientação registrada, mas a maioria do partido obstruiu junto. Isolada: nenhum dos dois.</p>
+        <div class="cp-box dash-skeleton" data-c="obsPart"></div>
+      </div>
+      <div class="cp-card" id="contra-bancada" data-source="pauta partidos_votacao alinhamento">
+        <h2 class="cp-card-h">Quem mais vota contra a própria bancada</h2>
+        <p class="cp-card-n" data-n="contraBancada"></p>
+        <div class="cp-box dash-skeleton" data-c="contraBancada"></div>
+      </div>
+    </div>
+    <div class="cp-card" id="alinhamento-governo" data-source="pauta partidos_votacao alinhamento">
+      <h2 class="cp-card-h">Alinhamento ao governo Lula por partido</h2>
+      <p class="cp-card-n">Parcela dos votos que seguiram a orientação do líder do governo, quando ele orientou Sim ou Não, a partir de janeiro de 2023. Ao lado, a coesão: quanto os deputados votaram como a maioria do próprio partido.</p>
+      <div class="cp-legend" data-leg="gov"></div>
+      <div class="cp-box dash-skeleton" data-c="gov"></div>
+    </div>
+</section>
+
+  <section class="cp-page" id="pauta" role="tabpanel" hidden>
+    <div class="cp-grid cp-grid-2">
+      <div class="cp-card" id="pauta-temas" data-source="pauta partidos_votacao alinhamento">
+        <h2 class="cp-card-h">Votações nominais por tema</h2>
+        <p class="cp-card-n">Tema oficial da proposição votada, segundo a classificação da Câmara. Clique em um tema para filtrar a lista de proposições.</p>
+        <div class="cp-box dash-skeleton" data-c="temas"></div>
+      </div>
+      <div class="cp-grid" style="grid-template-columns: 1fr;">
+        <div class="cp-card" id="pauta-etapas" data-source="pauta partidos_votacao alinhamento">
+          <h2 class="cp-card-h">O que estava em votação</h2>
+          <p class="cp-card-n">Classificação aproximada pela descrição da votação. Requerimentos tratam do andamento (urgência, adiamento, retirada de pauta); destaques e emendas mexem em partes do texto.</p>
+          <div class="cp-box dash-skeleton" data-c="etapas"></div>
+        </div>
+        <div class="cp-card" id="pauta-obst-tema" data-source="pauta partidos_votacao alinhamento">
+          <h2 class="cp-card-h">Obstruções por tema</h2>
+          <p class="cp-card-n" data-n="obstTema"></p>
+          <div class="cp-box dash-skeleton" data-c="obstTema"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cp-card" id="pauta-proposicoes" data-source="pauta partidos_votacao alinhamento">
+      <div class="cp-row">
+        <h2 class="cp-card-h">Proposições votadas</h2>
+        <input class="cp-input cp-busca-pauta" type="search" placeholder="Buscar por número ou assunto" aria-label="Buscar proposição">
+      </div>
+      <p class="cp-card-n" data-n="props"></p>
+      <button type="button" class="cp-picked cp-tema-picked" hidden></button>
+      <div class="cp-box dash-skeleton" data-c="props"></div>
+    </div>
+    <div class="cp-card" id="pauta-detalhe" data-source="pauta partidos_votacao alinhamento" hidden>
+      <div class="cp-row"><h2 class="cp-card-h" data-n="detT">Votações da proposição</h2><button type="button" class="cp-ghost cp-fechar-prop">Fechar</button></div>
+      <p class="cp-card-n" data-n="detE"></p>
+      <div class="cp-box" data-c="det"></div>
+    </div>
+  </section>
+
+  <section class="cp-page" id="projetos" role="tabpanel" hidden>
+    <div class="cp-card" id="projetos-mes" data-source="presenca">
+      <h2 class="cp-card-h">Projetos apresentados por mês</h2>
+      <p class="cp-card-n">Projetos de lei, de lei complementar, de decreto legislativo, de resolução e propostas de emenda à Constituição, contados para o primeiro autor.</p>
+      <div class="cp-chart dash-skeleton" data-c="projMes"></div>
+    </div>
+    <div class="cp-grid cp-grid-2">
+      <div class="cp-card" id="mais-projetos" data-source="presenca">
+        <h2 class="cp-card-h">Quem mais propôs projetos</h2>
+        <p class="cp-card-n">Projetos em que o deputado é o primeiro autor; ao lado, os que assinou como coautor.</p>
+        <div class="cp-box dash-skeleton" data-c="maisProj"></div>
+      </div>
+      <div class="cp-card" id="projetos-partido" data-source="presenca">
+        <h2 class="cp-card-h">Projetos por partido</h2>
+        <p class="cp-card-n">Total apresentado pelos deputados enquanto filiados a cada partido.</p>
+        <div class="cp-box dash-skeleton" data-c="projPartido"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cp-page" id="gastos" role="tabpanel" hidden>
+    <div class="cp-card" id="gastos-mes">
+      <h2 class="cp-card-h">Gastos da cota por mês</h2>
+      <p class="cp-card-n">Valor reembolsado pela Câmara no mês de competência da despesa: passagens, combustível, escritório, divulgação e outros gastos do gabinete. Não inclui salários.</p>
+      <div class="cp-chart dash-skeleton" data-c="gMes"></div>
+    </div>
+    <div class="cp-grid cp-grid-2">
+      <div class="cp-card" id="maior-gasto">
+        <h2 class="cp-card-h">Maior gasto por mês de mandato</h2>
+        <p class="cp-card-n" data-n="gMais"></p>
+        <div class="cp-box dash-skeleton" data-c="gMais"></div>
+      </div>
+      <div class="cp-card" id="menor-gasto">
+        <h2 class="cp-card-h">Menor gasto por mês de mandato</h2>
+        <p class="cp-card-n" data-n="gMenos"></p>
+        <div class="cp-box dash-skeleton" data-c="gMenos"></div>
+      </div>
+    </div>
+    <div class="cp-card" id="gasto-x-trabalho">
+      <h2 class="cp-card-h">Gasto e nota de trabalho</h2>
+      <p class="cp-card-n" data-n="gScatter"></p>
+      <div class="cp-legend" data-leg="gScatter" hidden></div>
+      <div class="cp-chart dash-skeleton" data-c="gScatter" style="min-height: 22rem"></div>
+    </div>
+    <div class="cp-grid cp-grid-2">
+      <div class="cp-card" id="gastos-categoria">
+        <h2 class="cp-card-h">Para onde vai o dinheiro</h2>
+        <p class="cp-card-n">Total por tipo de despesa no recorte escolhido.</p>
+        <div class="cp-box dash-skeleton" data-c="gCat"></div>
+      </div>
+      <div class="cp-card" id="gastos-partido">
+        <h2 class="cp-card-h">Gasto médio por partido</h2>
+        <p class="cp-card-n">Valor por deputado por mês de mandato, somando os deputados do partido em cada mês. Clique para filtrar o painel.</p>
+        <div class="cp-box dash-skeleton" data-c="gPart"></div>
+      </div>
+    </div>
+    <div class="cp-card" id="fornecedores">
+      <h2 class="cp-card-h">Principais fornecedores</h2>
+      <p class="cp-card-n" data-n="gForn"></p>
+      <div class="cp-box dash-skeleton" data-c="gForn"></div>
+    </div>
+  </section>
+
+  <section class="cp-page" id="trabalho" role="tabpanel" hidden>
+    <div class="cp-card" id="trabalho-nota" data-source="presenca">
+      <h2 class="cp-card-h">Nota de trabalho</h2>
+      <p class="cp-card-n" data-n="trabalho"></p>
+      <div class="cp-pesos" data-c="pesos"></div>
+    </div>
+    <div class="cp-card" id="trabalho-deputado" data-source="presenca" hidden>
+      <h2 class="cp-card-h" data-n="trabCompT">Composição da nota</h2>
+      <p class="cp-card-n">Percentil do deputado em cada critério, comparado à Câmara. Em abstenções, percentil alto quer dizer menos abstenções que os demais; em presença, mais presença.</p>
+      <div class="cp-box" data-c="trabComp"></div>
+    </div>
+    <div class="cp-grid cp-grid-2">
+      <div class="cp-card" id="mais-trabalham" data-source="presenca">
+        <h2 class="cp-card-h">Quem mais trabalha</h2>
+        <p class="cp-card-n" data-n="trabMais"></p>
+        <div class="cp-box dash-skeleton" data-c="trabMais"></div>
+      </div>
+      <div class="cp-card" id="menos-trabalham" data-source="presenca">
+        <h2 class="cp-card-h">Quem menos trabalha</h2>
+        <p class="cp-card-n" data-n="trabMenos"></p>
+        <div class="cp-box dash-skeleton" data-c="trabMenos"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cp-page" id="deputados" role="tabpanel" hidden>
+    <div class="cp-card" id="tabela-deputados" data-source="presenca">
+      <div class="cp-row">
+        <h2 class="cp-card-h">Todos os deputados</h2>
+        <input class="cp-input cp-busca" type="search" placeholder="Buscar por nome" aria-label="Buscar deputado por nome">
+      </div>
+      <p class="cp-card-n" data-n="tabDep"></p>
+      <div class="cp-box dash-skeleton" data-c="tabDep"></div>
+    </div>
+  </section>
+
+  <section class="cp-page" id="partidos" role="tabpanel" hidden>
+    <div class="cp-card" id="tabela-partidos" data-source="presenca">
+      <h2 class="cp-card-h">Todos os partidos</h2>
+      <p class="cp-card-n">Bancada média é o número médio de deputados do partido em exercício nas sessões do período. Clique em um partido para filtrar o painel.</p>
+      <div class="cp-box dash-skeleton" data-c="tabPart"></div>
+    </div>
+  </section>
+
+  <section class="cp-page" id="metodo" role="tabpanel" hidden>
+    <div class="cp-card">
+      <div class="cp-prose">
+        <h2 class="cp-prose-h">De onde vêm os números</h2>
+        <p class="cp-prose-p">Tudo vem dos Dados Abertos da Câmara dos Deputados: listas de presença dos eventos, votos das votações nominais, autoria das proposições e o histórico de exercício de cada deputado. O período cobre os quatro anos anteriores à montagem do painel.</p>
+        <h2 class="cp-prose-h">Sessões e presença</h2>
+        <p class="cp-prose-p">Contam apenas as sessões deliberativas do Plenário que têm lista de presença publicada. Para cada sessão, espera-se a presença de quem estava em exercício do mandato naquele momento, segundo o histórico do deputado; licenciados e suplentes fora do exercício não entram na conta.</p>
+        <h2 class="cp-prose-h">O que é uma ausência aqui</h2>
+        <p class="cp-prose-p">Ausência é uma sessão em que o deputado estava em exercício e não aparece na lista de presença. A fonte não informa se a falta foi justificada, então missões oficiais, licenças médicas curtas e ausências abonadas contam como ausência. Presidentes, membros da Mesa e líderes costumam ter ausências abonadas pelo cargo e por isso aparecem com taxas altas.</p>
+        <h2 class="cp-prose-h">Percentil de presença</h2>
+        <p class="cp-prose-p">O percentil coloca a taxa de presença do deputado entre as de todos os deputados da Câmara no período escolhido, independentemente dos filtros de partido e estado. Entram na comparação só os que estiveram em exercício no mínimo de sessões definido no filtro de rankings. Percentil 80 quer dizer presença igual ou maior que a de 80% desses deputados; quem empata recebe o mesmo percentil.</p>
+        <h2 class="cp-prose-h">Nota de trabalho</h2>
+        <p class="cp-prose-p">A nota cruza cinco critérios. Para não favorecer quem ficou mais tempo no mandato, cada um é medido em proporção: presença sobre as sessões em exercício; reuniões de comissão, projetos e coautorias por sessão em exercício; abstenções como parcela dos votos dados. Em cada critério, o deputado recebe o percentil dele entre todos os da Câmara que atingem o mínimo de sessões, invertido nas abstenções, em que menos é melhor. A nota é a média desses percentis, ponderada pelos pesos escolhidos, e vai de 0 a 100.</p>
+        <p class="cp-prose-p">É um indicador de atividade registrada, não de qualidade do mandato. Relatorias, articulação política, trabalho na base eleitoral e cargos como a Presidência da Câmara, a Mesa e as lideranças não aparecem nos dados. Obstruções ficam de fora: são um instrumento regimental legítimo, usado sobretudo pela oposição, e não indicam falta de trabalho.</p>
+        <h2 class="cp-prose-h">Votações</h2>
+        <p class="cp-prose-p">São as votações nominais do Plenário. A participação é a parcela das votações ocorridas durante o exercício em que o deputado tem voto registrado. Obstrução é um registro feito por quem está presente; “outros registros” reúne o Artigo 17, usado por quem preside a sessão, e votos sem tipo informado.</p>
+        <h2 class="cp-prose-h">Obstrução</h2>
+        <p class="cp-prose-p">Quem registra obstrução está presente, mas não entra no quórum da votação. É uma ferramenta regimental da minoria para atrasar ou forçar negociação de uma pauta, e a ausência por obstrução aprovada pela bancada não gera desconto. Cada registro é classificado como orientado (a liderança do partido, da federação ou de um bloco que inclui o partido orientou obstruir), com a bancada (sem orientação registrada, mas a maioria do partido obstruiu) ou isolado.</p>
+        <h2 class="cp-prose-h">Fidelidade e alinhamento</h2>
+        <p class="cp-prose-p">Votar com a bancada é votar como a maioria dos deputados do próprio partido naquela votação; só contam partidos com ao menos três votantes. A coesão do partido é a média disso entre seus deputados. O alinhamento ao governo compara o voto com a orientação do líder do governo, quando ela foi Sim ou Não, e considera só votações a partir de janeiro de 2023, já no governo Lula. Votos do presidente da sessão (Artigo 17) ficam de fora.</p>
+        <h2 class="cp-prose-h">Pauta</h2>
+        <p class="cp-prose-p">Cada votação nominal está ligada à proposição em discussão. O tema é o primeiro da classificação oficial da Câmara para aquela proposição. A etapa (texto principal, destaque ou emenda, requerimento) é deduzida da descrição da votação e pode ter erros pontuais. O resultado mostrado é o da última votação de texto principal no período.</p>
+        <h2 class="cp-prose-h">Cota parlamentar</h2>
+        <p class="cp-prose-p">A Cota para o Exercício da Atividade Parlamentar reembolsa despesas do gabinete: passagens, combustível, aluguel de escritório e de veículos, divulgação do mandato, consultorias e outras. Os valores são os líquidos reembolsados, pelo mês de competência informado pela Câmara. Despesas registradas em nome de lideranças partidárias ficam de fora, e salários de assessores não fazem parte da cota.</p>
+        <p class="cp-prose-p">Para comparar deputados com tempos de mandato diferentes, o gasto é dividido pelos meses de mandato: meses em que o deputado era esperado em alguma sessão ou teve despesa registrada. O teto da cota varia por estado, porque inclui as passagens até Brasília; deputados de estados distantes tendem a gastar mais. Fornecedores pessoa física aparecem só pelo nome, sem CPF. A lista de fornecedores soma os dez maiores de cada deputado em cada ano, então os totais ali são aproximados.</p>
+        <h2 class="cp-prose-h">Projetos</h2>
+        <p class="cp-prose-p">Entram projetos de lei, de lei complementar, de decreto legislativo, de resolução e propostas de emenda à Constituição, pela data de apresentação. O projeto conta para o primeiro signatário; as demais assinaturas de autoria aparecem como coautoria, e assinaturas de mero apoio a emendas constitucionais ficam de fora.</p>
+        <h2 class="cp-prose-h">Partidos</h2>
+        <p class="cp-prose-p">Cada sessão, voto e projeto é atribuído ao partido do deputado naquela data. Quem trocou de legenda aparece nos dois partidos, cada um com o seu trecho. Nos rankings por taxa ficam de fora os partidos com bancada média inferior a um deputado e os deputados sem partido.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer class="cp-rodape">
+  Projeto independente, sem vínculo com a Câmara dos Deputados. Dados públicos coletados diariamente de
+  <a class="cp-link" href="https://dadosabertos.camara.leg.br" target="_blank" rel="noopener">dadosabertos.camara.leg.br</a>.
+</footer>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
