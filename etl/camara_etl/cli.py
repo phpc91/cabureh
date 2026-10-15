@@ -83,6 +83,20 @@ def build(args: argparse.Namespace) -> int:
     }
     (out / "meta.json").write_text(json.dumps(meta_saida, ensure_ascii=False, indent=1))
     log.info("pronto em %ds", meta_saida["duracao_s"])
+
+    # Barreira contra publicar um painel vazio se alguma fonte da Câmara vier quebrada
+    problemas = []
+    if ativ.resumo["sessoes"] < 50:
+        problemas.append(f"poucas sessões deliberativas ({ativ.resumo['sessoes']})")
+    if ativ.resumo["votacoes_nominais"] < 100:
+        problemas.append(f"poucas votações nominais ({ativ.resumo['votacoes_nominais']})")
+    if ativ.resumo["deputados"] < 400:
+        problemas.append(f"poucos deputados ({ativ.resumo['deputados']})")
+    if resumo_cotas is not None and resumo_cotas["total"] <= 0:
+        problemas.append("cota parlamentar sem valores")
+    if problemas:
+        log.error("dados suspeitos, nada será publicado: %s", "; ".join(problemas))
+        return 1
     return 0
 
 
