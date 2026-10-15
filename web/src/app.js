@@ -12,6 +12,7 @@ const TROCAS = [
   [/deputados federais/g, 'senadores'], [/Deputados/g, 'Senadores'], [/Deputado/g, 'Senador'], [/deputados/g, 'senadores'],
   [/deputada/g, 'senadora'], [/deputado/g, 'senador'],
   [/sessões deliberativas/g, 'sessões com votação nominal'], [/sessão deliberativa/g, 'sessão com votação nominal'],
+  [/senadores do Senado/g, 'senadores'],
 ];
 const tx = (s) => {
   if (s == null) return s;

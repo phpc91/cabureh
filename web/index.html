@@ -15,7 +15,7 @@
 <div id="dash-root">
 <div class="cp">
   <header class="cp-head">
-    <nav class="cp-casa" aria-label="Casa legislativa">
+    <nav class="cp-casa" aria-label="Casa legislativa" data-notx>
       <a class="cp-casa-b" data-casa-link="camara" href="./">Câmara</a>
       <a class="cp-casa-b" data-casa-link="senado" href="./?casa=senado">Senado</a>
     </nav>
@@ -184,7 +184,7 @@
     <div class="cp-grid cp-grid-2">
       <div class="cp-card" id="pauta-temas" data-source="pauta partidos_votacao alinhamento">
         <h2 class="cp-card-h">Votações nominais por tema</h2>
-        <p class="cp-card-n">Tema oficial da proposição votada, segundo a classificação da Câmara. Clique em um tema para filtrar a lista de proposições.</p>
+        <p class="cp-card-n" data-notx>Tema da proposição votada, segundo a classificação temática da Câmara dos Deputados (no Senado, pela numeração única do projeto; indicações de autoridades e requerimentos têm grupos próprios). Clique em um tema para filtrar a lista de proposições.</p>
         <div class="cp-box dash-skeleton" data-c="temas"></div>
       </div>
       <div class="cp-grid" style="grid-template-columns: 1fr;">

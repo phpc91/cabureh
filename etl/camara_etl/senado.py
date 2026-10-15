@@ -258,7 +258,8 @@ def montar(fonte: Fonte, periodo: Periodo, legislaturas: list[int], nomes_deputa
     aus: dict[tuple, int] = defaultdict(int)
     por_sessao: dict[int, list[dict]] = defaultdict(list)
     for v in no_periodo:
-        por_sessao[v.get("codigoSessao")].append(v)
+        if v.get("votos"):          # votações recentes podem sair antes dos votos individuais
+            por_sessao[v.get("codigoSessao")].append(v)
     sessoes_meta = []
     for cs, vs in por_sessao.items():
         data = vs[0]["dataSessao"]
