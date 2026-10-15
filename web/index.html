@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Presença na Câmara</title>
-  <meta name="description" content="Presença, votações, pauta, gastos e trabalho dos deputados federais, a partir dos Dados Abertos da Câmara dos Deputados.">
+  <meta name="description" content="Presença, votações, pauta, gastos, emendas e trabalho dos deputados federais, a partir dos Dados Abertos da Câmara dos Deputados e do Portal da Transparência.">
   <meta property="og:title" content="Presença na Câmara">
-  <meta property="og:description" content="Presença, votações, gastos e trabalho dos deputados federais, atualizados todos os dias a partir dos dados abertos da Câmara.">
+  <meta property="og:description" content="Presença, votações, gastos, emendas e trabalho dos deputados federais, atualizados todos os dias a partir de dados públicos.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='17' width='6' height='12' rx='1.5' fill='%232a78d6'/%3E%3Crect x='13' y='9' width='6' height='20' rx='1.5' fill='%232a78d6'/%3E%3Crect x='23' y='4' width='6' height='25' rx='1.5' fill='%232a78d6'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -49,6 +49,7 @@
     <div class="cp-kpi"><div class="cp-kpi-l">Abstenções</div><div class="cp-kpi-v dash-skeleton" data-k="abs" data-source="presenca">—</div><div class="cp-kpi-s" data-k="absS"></div></div>
     <div class="cp-kpi"><div class="cp-kpi-l">Projetos apresentados</div><div class="cp-kpi-v dash-skeleton" data-k="proj" data-source="presenca">—</div><div class="cp-kpi-s" data-k="projS"></div></div>
     <div class="cp-kpi"><div class="cp-kpi-l">Cota parlamentar</div><div class="cp-kpi-v dash-skeleton" data-k="cota">—</div><div class="cp-kpi-s" data-k="cotaS"></div></div>
+    <div class="cp-kpi"><div class="cp-kpi-l">Emendas individuais</div><div class="cp-kpi-v dash-skeleton" data-k="emen">—</div><div class="cp-kpi-s" data-k="emenS"></div></div>
   </section>
 
   <div class="cp-tabs" role="tablist" aria-label="Seções">
@@ -57,6 +58,7 @@
     <button type="button" class="cp-tab" role="tab" data-tab="pauta">Pauta</button>
     <button type="button" class="cp-tab" role="tab" data-tab="projetos">Projetos</button>
     <button type="button" class="cp-tab" role="tab" data-tab="gastos">Gastos</button>
+    <button type="button" class="cp-tab" role="tab" data-tab="emendas">Emendas</button>
     <button type="button" class="cp-tab" role="tab" data-tab="trabalho">Trabalho</button>
     <button type="button" class="cp-tab" role="tab" data-tab="deputados">Deputados</button>
     <button type="button" class="cp-tab" role="tab" data-tab="partidos">Partidos</button>
@@ -258,6 +260,65 @@
     </div>
   </section>
 
+  <section class="cp-page" id="emendas" role="tabpanel" hidden>
+    <div class="cp-grid cp-grid-2">
+      <div class="cp-card" id="emendas-ano">
+        <h2 class="cp-card-h">Emendas ao Orçamento por ano</h2>
+        <p class="cp-card-n" data-n="emAno"></p>
+        <div class="cp-legend" data-leg="emAno" hidden></div>
+        <div class="cp-chart dash-skeleton" data-c="emAno"></div>
+      </div>
+      <div class="cp-card" id="emendas-mes">
+        <h2 class="cp-card-h">Pagamentos por mês</h2>
+        <p class="cp-card-n" data-n="emMes"></p>
+        <div class="cp-chart dash-skeleton" data-c="emMes"></div>
+      </div>
+    </div>
+    <div class="cp-row">
+      <span class="cp-card-n">Comparar deputados por:</span>
+      <div class="cp-seg" role="group" aria-label="Comparar deputados por">
+        <button type="button" class="cp-seg-b" data-modoem="valor">Valor por ano</button>
+        <button type="button" class="cp-seg-b" data-modoem="pix">Transferência especial</button>
+        <button type="button" class="cp-seg-b" data-modoem="fora">Fora do estado</button>
+        <button type="button" class="cp-seg-b" data-modoem="exec">Execução</button>
+      </div>
+    </div>
+    <div class="cp-grid cp-grid-2">
+      <div class="cp-card" id="emendas-mais">
+        <h2 class="cp-card-h" data-n="emMaisT">Maiores valores</h2>
+        <p class="cp-card-n" data-n="emMais"></p>
+        <div class="cp-box dash-skeleton" data-c="emMais"></div>
+      </div>
+      <div class="cp-card" id="emendas-menos">
+        <h2 class="cp-card-h" data-n="emMenosT">Menores valores</h2>
+        <p class="cp-card-n" data-n="emMenos"></p>
+        <div class="cp-box dash-skeleton" data-c="emMenos"></div>
+      </div>
+    </div>
+    <div class="cp-grid cp-grid-2">
+      <div class="cp-card" id="emendas-area">
+        <h2 class="cp-card-h">Áreas</h2>
+        <p class="cp-card-n">Valor empenhado em emendas individuais por área do Orçamento. Transferências especiais vão direto para o caixa de estados e municípios e não têm área definida.</p>
+        <div class="cp-box dash-skeleton" data-c="emArea"></div>
+      </div>
+      <div class="cp-card" id="emendas-partido">
+        <h2 class="cp-card-h">Transferência especial por partido</h2>
+        <p class="cp-card-n">Parcela do valor das emendas individuais enviada por transferência especial, a modalidade conhecida como emenda Pix. Clique para filtrar o painel.</p>
+        <div class="cp-box dash-skeleton" data-c="emPart"></div>
+      </div>
+    </div>
+    <div class="cp-card" id="emendas-destinos">
+      <h2 class="cp-card-h">Destinos</h2>
+      <p class="cp-card-n" data-n="emDest"></p>
+      <div class="cp-box dash-skeleton" data-c="emDest"></div>
+    </div>
+    <div class="cp-card" id="emendas-favorecidos">
+      <h2 class="cp-card-h">Quem recebeu</h2>
+      <p class="cp-card-n" data-n="emFav"></p>
+      <div class="cp-box dash-skeleton" data-c="emFav"></div>
+    </div>
+  </section>
+
   <section class="cp-page" id="trabalho" role="tabpanel" hidden>
     <div class="cp-card" id="trabalho-nota" data-source="presenca">
       <h2 class="cp-card-h">Nota de trabalho</h2>
@@ -306,7 +367,7 @@
     <div class="cp-card">
       <div class="cp-prose">
         <h2 class="cp-prose-h">De onde vêm os números</h2>
-        <p class="cp-prose-p">Tudo vem dos Dados Abertos da Câmara dos Deputados: listas de presença dos eventos, votos das votações nominais, autoria das proposições e o histórico de exercício de cada deputado. O período cobre os quatro anos anteriores à montagem do painel.</p>
+        <p class="cp-prose-p">Quase tudo vem dos Dados Abertos da Câmara dos Deputados; as emendas vêm do Portal da Transparência. Da Câmara saem listas de presença dos eventos, votos das votações nominais, autoria das proposições e o histórico de exercício de cada deputado. O período cobre os quatro anos anteriores à montagem do painel.</p>
         <h2 class="cp-prose-h">Sessões e presença</h2>
         <p class="cp-prose-p">Contam apenas as sessões deliberativas do Plenário que têm lista de presença publicada. Para cada sessão, espera-se a presença de quem estava em exercício do mandato naquele momento, segundo o histórico do deputado; licenciados e suplentes fora do exercício não entram na conta.</p>
         <h2 class="cp-prose-h">O que é uma ausência aqui</h2>
@@ -327,6 +388,10 @@
         <h2 class="cp-prose-h">Cota parlamentar</h2>
         <p class="cp-prose-p">A Cota para o Exercício da Atividade Parlamentar reembolsa despesas do gabinete: passagens, combustível, aluguel de escritório e de veículos, divulgação do mandato, consultorias e outras. Os valores são os líquidos reembolsados, pelo mês de competência informado pela Câmara. Despesas registradas em nome de lideranças partidárias ficam de fora, e salários de assessores não fazem parte da cota.</p>
         <p class="cp-prose-p">Para comparar deputados com tempos de mandato diferentes, o gasto é dividido pelos meses de mandato: meses em que o deputado era esperado em alguma sessão ou teve despesa registrada. O teto da cota varia por estado, porque inclui as passagens até Brasília; deputados de estados distantes tendem a gastar mais. Fornecedores pessoa física aparecem só pelo nome, sem CPF. A lista de fornecedores soma os dez maiores de cada deputado em cada ano, então os totais ali são aproximados.</p>
+        <h2 class="cp-prose-h">Emendas parlamentares</h2>
+        <p class="cp-prose-p">As emendas vêm do Portal da Transparência, da Controladoria-Geral da União, e são contadas pelo ano do Orçamento a que pertencem. Cada deputado tem direito a um valor fixo de emendas individuais por ano, e o governo é obrigado a executá-las. Elas podem ter finalidade definida (uma obra, um equipamento, um programa) ou ser transferências especiais, a chamada emenda Pix, em que o dinheiro cai direto no caixa do estado ou município sem destinação específica. Empenhado é o valor reservado no Orçamento; pago soma os pagamentos do ano e os restos a pagar quitados depois.</p>
+        <p class="cp-prose-p">O Portal identifica o autor só pelo nome. Cada emenda individual é ligada ao deputado que tem esse nome e estava em exercício entre julho do ano anterior e o fim do ano da emenda; quando o nome não bate exatamente, vale uma comparação que ignora títulos como Dr. e Pastor, desde que haja um único candidato e o nome não seja de um senador. Emendas que passaram a outro parlamentar por saída do autor contam para quem responde por elas hoje. Emendas de senadores, de bancada estadual, de comissão e de relator não têm um deputado como autor e aparecem só no gráfico anual da Câmara inteira.</p>
+        <p class="cp-prose-p">Os pagamentos mês a mês e a lista de quem recebeu vêm do arquivo de favorecidos do Portal. Em contratos de repasse, o favorecido registrado costuma ser a Caixa ou o Banco do Brasil, que operam o repasse, e não o destino final. Pessoas físicas aparecem agrupadas, sem nome nem CPF. Fora do estado compara a UF de destino com a do deputado e ignora emendas de alcance nacional ou sem local informado. Execução é o valor pago dividido pelo empenhado; emendas recentes ainda estão sendo pagas.</p>
         <h2 class="cp-prose-h">Projetos</h2>
         <p class="cp-prose-p">Entram projetos de lei, de lei complementar, de decreto legislativo, de resolução e propostas de emenda à Constituição, pela data de apresentação. O projeto conta para o primeiro signatário; as demais assinaturas de autoria aparecem como coautoria, e assinaturas de mero apoio a emendas constitucionais ficam de fora.</p>
         <h2 class="cp-prose-h">Partidos</h2>
@@ -338,7 +403,8 @@
 
 <footer class="cp-rodape">
   Projeto independente, sem vínculo com a Câmara dos Deputados. Dados públicos coletados diariamente de
-  <a class="cp-link" href="https://dadosabertos.camara.leg.br" target="_blank" rel="noopener">dadosabertos.camara.leg.br</a>.
+  <a class="cp-link" href="https://dadosabertos.camara.leg.br" target="_blank" rel="noopener">dadosabertos.camara.leg.br</a> e
+  <a class="cp-link" href="https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares" target="_blank" rel="noopener">portaldatransparencia.gov.br</a>.
 </footer>
 </div>
 <script type="module" src="./src/main.js"></script>

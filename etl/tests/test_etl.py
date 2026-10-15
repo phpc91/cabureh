@@ -157,3 +157,18 @@ def test_emendas(fonte):
     assert pf["favorecido"] == "Pessoas físicas (agrupadas)" and "JOAO" not in str(pf)
     dest = {(d["id_deputado"], d["destino"]) for d in s.destinos}
     assert (1, "CAMPINAS - SP") in dest and (2, "Bahia (estado)") in dest and (3, "Rio de Janeiro (estado)") in dest
+
+
+def test_casador_homonimos_e_janelas():
+    h = lambda ent, sai=None: [{"dataHora": ent, "situacao": "Exercício", "descricaoStatus": "Entrada - Posse", "siglaPartido": "PP", "siglaUf": "PI", "nome": "Átila Lira"}] + (
+        [{"dataHora": sai, "situacao": "FIM_MANDATO", "descricaoStatus": "Saída - Término", "siglaPartido": "PP", "siglaUf": "PI", "nome": "Átila Lira"}] if sai else [])
+    antigo = montar_deputado(10, h("2019-02-01T12:00", "2023-01-31T23:59"))
+    novo = montar_deputado(11, h("2023-02-01T12:00"))
+    herdeiro = montar_deputado(12, [{"dataHora": "2025-11-01T12:00", "situacao": "Exercício", "descricaoStatus": "Entrada - Posse de Suplente", "siglaPartido": "PL", "siglaUf": "SC", "nome": "Professora Marcivania"}])
+    c = emendas.Casador({10: antigo, 11: novo, 12: herdeiro}, {"ALAN RICK"})
+    assert c("ATILA LIRA", 2023) == 10       # apresentada no fim de 2022, pelo mandato antigo
+    assert c("ATILA LIRA", 2024) == 11
+    # herdou em novembro do ano da emenda: só a janela larga encontra; nome de uma palavra após o título
+    assert c("MARCIVANIA FLEXA (EX-PARLAMENTAR MARIA GORETH, NOS TERMOS ART. 78 LDO 2025)", 2025) == 12
+    assert c("MARCIVANIA FLEXA", 2023) is None
+    assert c("ALAN RICK", 2025) is None

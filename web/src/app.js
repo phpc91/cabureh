@@ -16,8 +16,8 @@ const C = dash.colors;
 const MUTED = 'var(--ds-chart-muted)';
 const F = ['sE', 'sP', 'vE', 'vS', 'vN', 'vA', 'vO', 'vX', 'cV', 'oE', 'pA', 'pC'];
 const SEM = 'Sem partido';
-const TABS = ['presenca', 'votacoes', 'pauta', 'projetos', 'gastos', 'trabalho', 'deputados', 'partidos', 'metodo'];
-const ui = { tab: 'presenca', modo: 'taxa', q: '', sortDep: { k: 'aus', dir: -1 }, sortPart: { k: 'taus', dir: -1 }, pesos: { pres: 2, com: 2, proj: 1, coaut: 1, abs: 1 }, sortObs: { k: 'obs', dir: -1 }, sortPauta: { k: 'n', dir: -1 }, sortDet: { k: 'data', dir: 1 }, tema: null, prop: null, qPauta: '', sortForn: { k: 'v', dir: -1 } };
+const TABS = ['presenca', 'votacoes', 'pauta', 'projetos', 'gastos', 'emendas', 'trabalho', 'deputados', 'partidos', 'metodo'];
+const ui = { tab: 'presenca', modo: 'taxa', q: '', sortDep: { k: 'aus', dir: -1 }, sortPart: { k: 'taus', dir: -1 }, pesos: { pres: 2, com: 2, proj: 1, coaut: 1, abs: 1 }, sortObs: { k: 'obs', dir: -1 }, sortPauta: { k: 'n', dir: -1 }, sortDet: { k: 'data', dir: 1 }, tema: null, prop: null, qPauta: '', sortForn: { k: 'v', dir: -1 }, sortDest: { k: 'e', dir: -1 }, sortFav: { k: 'v', dir: -1 }, modoEm: 'valor' };
 let cache3 = { key: '', G: null };
 let cache2 = { key: '', V: null };
 const FATORES = [
@@ -469,6 +469,185 @@ function paginaGastos(c) {
   ], ui.sortForn, 'forn', null, 'forn');
 }
 
+/* ---------- emendas parlamentares ---------- */
+const FONTES_EMENDAS = ['emendas', 'emendas_destinos', 'emendas_mes', 'emendas_favorecidos', 'emendas_tipos'];
+const PIX = 'Transferência especial';
+const TIPOS_EMENDA = [
+  { k: 'Finalidade definida', nome: 'Individual com finalidade definida', cor: C[0] },
+  { k: PIX, nome: 'Individual por transferência especial', cor: C[1] },
+  { k: 'Bancada', nome: 'De bancada estadual', cor: C[2] },
+  { k: 'Comissão', nome: 'De comissão', cor: C[3] },
+  { k: 'Relator', nome: 'De relator', cor: C[4] },
+];
+const MODOS_EM = {
+  valor: { maior: 'Mais emendas por ano', menor: 'Menos emendas por ano', rotulo: 'Por ano', v: (a) => a.porAno, f: (a) => reaisC(a.porAno),
+    sub: (a) => reais(a.e) + ' empenhados em ' + qtd(a.anos.size, 'ano', 'anos'), nota: 'Valor empenhado em emendas individuais dividido pelo número de anos do Orçamento em que o deputado tem emendas.' },
+  pix: { maior: 'Mais transferência especial', menor: 'Menos transferência especial', rotulo: 'Pix', v: (a) => a.ppix, f: (a) => pct(a.ppix, 0),
+    sub: (a) => reaisC(a.pix) + ' de ' + reaisC(a.e), nota: 'Parcela do valor das emendas individuais enviada por transferência especial (emenda Pix), sem destinação específica.' },
+  fora: { maior: 'Mais emendas fora do estado', menor: 'Menos emendas fora do estado', rotulo: 'Fora da UF', v: (a) => a.pfora, f: (a) => pct(a.pfora, 0),
+    sub: (a) => reaisC(a.fora) + ' de ' + reaisC(a.comUf) + ' com UF de destino', nota: 'Parcela do valor com UF de destino informada que foi para outro estado que não o do deputado.' },
+  exec: { maior: 'Maior execução', menor: 'Menor execução', rotulo: 'Pago', v: (a) => a.exec, f: (a) => pct(a.exec, 0),
+    sub: (a) => reaisC(a.pg) + ' pagos de ' + reaisC(a.e), nota: 'Valor pago dividido pelo empenhado. Emendas do ano corrente ainda estão sendo pagas, então anos recentes puxam a execução para baixo.' },
+};
+let cache4 = { key: '', E: null };
+function prepEmendas(em, de, me, fa, ti) {
+  return {
+    em: em.map((r) => ({ id: String(r.id_deputado), ano: String(r.ano), p: String(r.partido), tipo: String(r.tipo), area: String(r.area), uf: String(r.uf_destino || ''), n: +r.emendas || 0, e: +r.empenhado || 0, pg: +r.pago || 0 })),
+    dest: de.map((r) => ({ id: String(r.id_deputado), ano: String(r.ano), dest: String(r.destino), uf: String(r.uf || ''), e: +r.empenhado || 0, pg: +r.pago || 0 })),
+    mes: me.map((r) => ({ id: String(r.id_deputado), m: String(r.mes), p: String(r.partido), tipo: String(r.tipo), v: +r.valor || 0 })),
+    fav: fa.map((r) => ({ id: String(r.id_deputado), ano: String(r.ano), fav: String(r.favorecido || ''), doc: String(r.documento || ''), nat: String(r.natureza || ''), uf: String(r.uf || ''), mun: String(r.municipio || ''), v: +r.valor || 0, n: +r.pagamentos || 0 })),
+    tipos: ti.map((r) => ({ ano: String(r.ano), tipo: String(r.tipo), n: +r.emendas || 0, e: +r.empenhado || 0, pg: +r.pago || 0 })),
+  };
+}
+function contextoEmendas(c, E) {
+  const mset = new Set(c.meses), anos = [...new Set(c.meses.map((m) => m.slice(0, 4)))].sort();
+  const aset = new Set(anos);
+  const info = (id) => c.D.info.get(id) || {};
+  const geo = (r) => !c.P.uf || info(r.id).uf === c.P.uf;
+  const recorte = (r) => geo(r) && (!c.P.partido || r.p === c.P.partido) && (!c.P.deputado || r.id === c.P.deputado);
+  const atual = (r) => geo(r) && (!c.P.deputado || r.id === c.P.deputado) && (!c.P.partido || info(r.id).p === c.P.partido);
+  const doAno = E.em.filter((r) => aset.has(r.ano));
+  const porDep = new Map();
+  for (const r of doAno) {
+    let a = porDep.get(r.id);
+    if (!a) { a = { id: r.id, e: 0, pg: 0, n: 0, pix: 0, fora: 0, comUf: 0, anos: new Set() }; porDep.set(r.id, a); }
+    a.e += r.e; a.pg += r.pg; a.n += r.n; a.anos.add(r.ano);
+    if (r.tipo === PIX) a.pix += r.e;
+    if (r.uf) { a.comUf += r.e; if (r.uf !== info(r.id).uf) a.fora += r.e; }
+  }
+  for (const a of porDep.values()) { a.ppix = a.e ? a.pix / a.e : null; a.pfora = a.comUf ? a.fora / a.comUf : null; a.exec = a.e ? a.pg / a.e : null; a.porAno = a.e / (a.anos.size || 1); }
+  const porPart = new Map();
+  for (const r of doAno) { if (!geo(r)) continue; let a = porPart.get(r.p); if (!a) { a = { p: r.p, e: 0, pix: 0 }; porPart.set(r.p, a); } a.e += r.e; if (r.tipo === PIX) a.pix += r.e; }
+  const em = doAno.filter(recorte);
+  return {
+    E, anos, em, porDep, porPart,
+    total: d3.sum(em, (r) => r.e), pago: d3.sum(em, (r) => r.pg), pix: d3.sum(em, (r) => (r.tipo === PIX ? r.e : 0)),
+    mes: E.mes.filter((r) => mset.has(r.m) && recorte(r)),
+    dest: E.dest.filter((r) => aset.has(r.ano) && atual(r)),
+    fav: E.fav.filter((r) => aset.has(r.ano) && atual(r)),
+    tipos: E.tipos.filter((r) => aset.has(r.ano)),
+  };
+}
+function aguardandoEmendas(keys) {
+  const st = FONTES_EMENDAS.map((id) => dash.data(id).status);
+  const erro = st.some((x) => x === 'error');
+  for (const k of keys) { const b = caixa(k); if (!b) continue; b.classList.remove('dash-skeleton'); b.replaceChildren(erro ? el('div', 'cp-err', 'As emendas não foram carregadas nesta atualização') : el('p', 'cp-card-n', 'Carregando emendas…')); }
+}
+function colunasAno(box, anos, series, fmt, fmtEixo, msgVazio) {
+  // series: [{nome, cor, valores: [por ano]}], empilhadas
+  box.replaceChildren();
+  const tot = anos.map((a, i) => d3.sum(series, (s) => s.valores[i]));
+  const max = d3.max(tot) || 0;
+  if (!max) return vazio(box, msgVazio);
+  const W = Math.max(260, Math.floor(box.clientWidth)), H = 250, mt = 12, mb = 26, mr = 8;
+  const svg = d3.select(box).append('svg').attr('class', 'cp-svg').attr('width', '100%').attr('viewBox', '0 0 ' + W + ' ' + H).attr('role', 'img');
+  const y = d3.scaleLinear([0, d3.nice(0, max, 4)[1]], [H - mb, mt]);
+  const ticks = y.ticks(4);
+  const rot = svg.append('g').selectAll('text').data(ticks).join('text').attr('y', (t) => y(t)).attr('dy', '0.32em').text((t) => fmtEixo(t));
+  let ml = 0; rot.each(function (t) { ml = Math.max(ml, this.getComputedTextLength() || fmtEixo(t).length * 6.5); });
+  ml = Math.ceil(ml) + 10; rot.attr('x', ml - 8).attr('text-anchor', 'end');
+  svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', ml).attr('x2', W - mr).attr('y1', (t) => y(t)).attr('y2', (t) => y(t)).attr('stroke', 'var(--ds-chart-grid)');
+  const x = d3.scaleBand(anos, [ml, W - mr]).paddingInner(0.35).paddingOuter(0.2);
+  const larg = Math.min(56, x.bandwidth());
+  svg.append('g').selectAll('text').data(anos).join('text').attr('x', (a) => x(a) + x.bandwidth() / 2).attr('y', H - mb + 16).attr('text-anchor', 'middle').text((a) => a);
+  const g = svg.append('g');
+  anos.forEach((a, i) => {
+    let base = 0; const cx = x(a) + x.bandwidth() / 2;
+    series.forEach((s) => {
+      const v = s.valores[i]; if (!v) return;
+      const y0 = y(base), y1 = y(base + v), h = Math.max(1, y0 - y1 - (base > 0 ? 2 : 0));
+      g.append('rect').attr('x', cx - larg / 2).attr('width', larg).attr('y', y0 - (base > 0 ? 2 : 0) - h).attr('height', h).attr('rx', 2).attr('fill', s.cor).attr('data-i', i);
+      base += v;
+    });
+  });
+  svg.append('line').attr('x1', ml).attr('x2', W - mr).attr('y1', H - mb).attr('y2', H - mb).attr('stroke', 'var(--ds-chart-axis)');
+  svg.append('rect').attr('x', ml).attr('y', 0).attr('width', Math.max(0, W - ml - mr)).attr('height', H).attr('fill', 'transparent')
+    .on('pointermove', (ev) => {
+      const px = d3.pointer(ev, svg.node())[0];
+      const i = d3.leastIndex(anos, (a, b) => Math.abs(x(a) + x.bandwidth() / 2 - px) - Math.abs(x(b) + x.bandwidth() / 2 - px));
+      g.selectAll('rect').attr('opacity', function () { return +this.getAttribute('data-i') === i ? 1 : 0.5; });
+      mostrarTip(box, ev, [{ h: 'Orçamento de ' + anos[i] }, ...series.filter((s) => s.valores[i]).map((s) => ({ c: s.cor, k: s.nome, v: fmt(s.valores[i]) })), ...(series.length > 1 ? [{ k: 'Total', v: fmt(tot[i]) }] : [])]);
+    })
+    .on('pointerleave', () => { g.selectAll('rect').attr('opacity', 1); esconderTip(box); });
+}
+function paginaEmendas(c) {
+  const keys = ['emAno', 'emMes', 'emMais', 'emMenos', 'emArea', 'emPart', 'emDest', 'emFav'];
+  for (const b of root.querySelectorAll('.cp-seg-b[data-modoem]')) b.setAttribute('aria-pressed', String(b.dataset.modoem === ui.modoEm));
+  if (!c.ce) return aguardandoEmendas(keys);
+  for (const k of keys) caixa(k).classList.remove('dash-skeleton');
+  const ce = c.ce;
+  const fmtPg = (e, pg) => reais(e) + ' empenhados · ' + reais(pg) + ' pagos';
+  // por ano: Câmara inteira mostra todos os tipos (inclusive de senadores e coletivas); recorte mostra as individuais dele
+  if (!c.filtrado) {
+    const series = TIPOS_EMENDA.map((t) => ({ nome: t.nome, cor: t.cor, valores: ce.anos.map((a) => d3.sum(ce.tipos, (r) => (r.ano === a && r.tipo === t.k ? r.e : 0))) })).filter((s) => d3.sum(s.valores) > 0);
+    nota('emAno', 'Valor empenhado em todas as emendas do Orçamento, por ano, inclusive as de senadores e as coletivas. Só as individuais têm um deputado como autor.');
+    legenda('emAno', series.map((s) => ({ nome: s.nome, c: s.cor })));
+    colunasAno(caixa('emAno'), ce.anos, series, reais, reaisC, 'Nenhuma emenda nos anos escolhidos.');
+  } else {
+    const series = TIPOS_EMENDA.slice(0, 2).map((t) => ({ nome: t.nome, cor: t.cor, valores: ce.anos.map((a) => d3.sum(ce.em, (r) => (r.ano === a && r.tipo === t.k ? r.e : 0))) }));
+    nota('emAno', 'Valor empenhado nas emendas individuais de ' + (c.P.deputado ? rotuloRecorte(c) : 'deputados do recorte') + ', por ano do Orçamento.');
+    legenda('emAno', series.map((s) => ({ nome: s.nome, c: s.cor })));
+    colunasAno(caixa('emAno'), ce.anos, series, reais, reaisC, 'Nenhuma emenda individual com os filtros escolhidos.');
+  }
+  // pagamentos por mês
+  const porMesE = d3.rollup(ce.mes, (rs) => d3.sum(rs, (r) => r.v), (r) => r.m);
+  nota('emMes', 'Valor pago aos favorecidos das emendas individuais' + (c.filtrado ? ' do recorte' : ' de deputados') + ' em cada mês, qualquer que seja o ano da emenda.');
+  colunasMensais(caixa('emMes'), c.meses, c.meses.map((m) => porMesE.get(m) || 0), C[0], 'Pago', reais, 'Nenhum pagamento com os filtros escolhidos.', reaisC);
+  // rankings
+  const modo = MODOS_EM[ui.modoEm] || MODOS_EM.valor;
+  root.querySelector('[data-n="emMaisT"]').textContent = modo.maior;
+  root.querySelector('[data-n="emMenosT"]').textContent = modo.menor;
+  const sessoes = new Map(c.deps.map((d) => [d.id, d.sE]));
+  const elegiveis = [...ce.porDep.values()].filter((a) => (sessoes.get(a.id) || 0) >= c.minSess && a.e > 0 && modo.v(a) != null)
+    .map((a) => Object.assign({}, c.D.info.get(a.id) || { nome: a.id, p: '', uf: '' }, a));
+  const crit = modo.nota + ' ' + criterio(c);
+  nota('emMais', crit); nota('emMenos', crit);
+  const maxV = d3.max(elegiveis, modo.v) || 1;
+  const opE = { rotulo: modo.rotulo, valor: modo.f, sub: modo.sub, bar: (a) => (ui.modoEm === 'valor' ? modo.v(a) / maxV : modo.v(a)), vazio: 'Ninguém com emendas atende ao mínimo de sessões com os filtros escolhidos.' };
+  ranking(caixa('emMais'), [...elegiveis].sort((a, b) => modo.v(b) - modo.v(a) || b.e - a.e).slice(0, 15), opE, c);
+  ranking(caixa('emMenos'), [...elegiveis].sort((a, b) => modo.v(a) - modo.v(b) || b.e - a.e).slice(0, 15), opE, c);
+  // áreas
+  const porArea = d3.rollups(ce.em, (rs) => [d3.sum(rs, (r) => r.e), d3.sum(rs, (r) => r.pg)], (r) => r.area).filter((x) => x[1][0] > 0).sort((a, b) => b[1][0] - a[1][0]);
+  const totA = d3.sum(porArea, (x) => x[1][0]) || 1;
+  barras(caixa('emArea'), porArea.map(([k, [e, pg]]) => ({ chave: k, rotulo: k, valor: e, texto: reaisC(e) + ' · ' + pct(e / totA, 0), tip: () => [{ h: k }, { k: 'Empenhado', v: reais(e) }, { k: 'Pago', v: reais(pg) }, { k: 'Do total', v: pct(e / totA) }] })),
+    { cor: C[0], vazio: 'Nenhuma emenda individual com os filtros escolhidos.' });
+  // partidos
+  const bancada = new Set(partidosComBancada(c).map((a) => a.p));
+  const ps = [...ce.porPart.values()].filter((a) => bancada.has(a.p) && a.e > 0).map((a) => Object.assign(a, { ppix: a.pix / a.e })).sort((a, b) => b.ppix - a.ppix);
+  barras(caixa('emPart'), ps.map((a) => ({ chave: a.p, rotulo: a.p, valor: a.ppix, texto: pct(a.ppix, 0), tip: () => [{ h: a.p }, { k: 'Transferência especial', v: reais(a.pix) }, { k: 'Total individual', v: reais(a.e) }, { k: 'Parcela', v: pct(a.ppix) }] })),
+    { cor: C[1], max: 1, marcado: c.P.partido, aoClicar: alternarPartido, vazio: 'Nenhuma emenda individual com os filtros escolhidos.' });
+  // destinos
+  const porDest = new Map();
+  for (const r of ce.dest) { let a = porDest.get(r.dest); if (!a) { a = { chave: r.dest, dest: r.dest, uf: r.uf || '—', e: 0, pg: 0, deps: new Set() }; porDest.set(r.dest, a); } a.e += r.e; a.pg += r.pg; a.deps.add(r.id); }
+  const dest = [...porDest.values()].map((a) => Object.assign(a, { nd: a.deps.size, exec: a.e ? a.pg / a.e : null })).sort((a, b) => b.e - a.e).slice(0, 60);
+  nota('emDest', (c.P.deputado ? 'Os principais destinos das emendas do deputado' : 'Os 60 principais destinos do recorte') + ', somando os dez maiores de cada deputado em cada ano. “Estado” indica emendas para o governo estadual ou sem município informado. ' + fmtPg(ce.total, ce.pago) + ' no total do recorte.');
+  tabela(caixa('emDest'), dest, [
+    { k: 'dest', h: 'Destino', l: 1, wrap: 1, f: (d) => d.dest },
+    { k: 'e', h: 'Empenhado', f: (d) => reais(d.e) },
+    { k: 'pg', h: 'Pago', f: (d) => reais(d.pg) },
+    { k: 'exec', h: 'Execução', f: (d) => pct(d.exec, 0) },
+    { k: 'nd', h: 'Deputados', f: (d) => num(d.nd) },
+  ], ui.sortDest, 'forn', null, 'dest');
+  // favorecidos
+  const porFav = new Map();
+  for (const r of ce.fav) {
+    const chave = r.doc === 'Pessoa física' ? 'pf' : (r.doc || r.fav.toUpperCase());
+    let a = porFav.get(chave);
+    if (!a) { a = { chave, fav: r.fav, doc: r.doc && r.doc !== 'Pessoa física' ? r.doc : '—', nat: r.nat || '—', local: r.mun ? r.mun + (r.uf ? ' - ' + r.uf : '') : (r.uf || '—'), v: 0, n: 0, deps: new Set() }; porFav.set(chave, a); }
+    a.v += r.v; a.n += r.n; a.deps.add(r.id);
+  }
+  const fav = [...porFav.values()].map((a) => Object.assign(a, { nd: a.deps.size })).sort((a, b) => b.v - a.v).slice(0, 60);
+  nota('emFav', (c.P.deputado ? 'Quem mais recebeu pelas emendas do deputado' : 'Os 60 que mais receberam no recorte') + ', em pagamentos feitos nos anos escolhidos e somando os dez maiores favorecidos de cada deputado por ano. Caixa e Banco do Brasil aparecem como intermediários de contratos de repasse. Pessoas físicas aparecem agrupadas, sem nome.');
+  tabela(caixa('emFav'), fav, [
+    { k: 'fav', h: 'Favorecido', l: 1, wrap: 1, f: (d) => d.fav || '—' },
+    { k: 'doc', h: 'CNPJ', l: 1, f: (d) => d.doc },
+    { k: 'nat', h: 'Natureza', l: 1, wrap: 1, f: (d) => d.nat },
+    { k: 'local', h: 'Local', l: 1, f: (d) => d.local },
+    { k: 'v', h: 'Recebido', f: (d) => reais(d.v) },
+    { k: 'nd', h: 'Deputados', f: (d) => num(d.nd) },
+  ], ui.sortFav, 'forn', null, 'fav');
+}
+
 /* ---------- nota de trabalho ---------- */
 let cacheTrab = { c: null, pesos: '', r: null };
 function notasTrabalho(c) {
@@ -750,6 +929,8 @@ const COLS_DEP = [
   { k: 'fid', h: 'Com a bancada', f: (d) => pct(d.fid) },
   { k: 'gov', h: 'Com o governo', f: (d) => pct(d.gov) },
   { k: 'cota', h: 'Cota por mês', f: (d) => reais(d.cota) },
+  { k: 'emen', h: 'Emendas por ano', f: (d) => reais(d.emen) },
+  { k: 'pix', h: 'Emenda Pix', f: (d) => pct(d.pix, 0) },
   { k: 'vE', h: 'Votações', f: (d) => num(d.vE) },
   { k: 'pvot', h: 'Votou em', f: (d) => pct(d.pvot) },
   { k: 'vA', h: 'Abstenções', f: (d) => num(d.vA) },
@@ -771,6 +952,7 @@ const COLS_PART = [
   { k: 'vO', h: 'Obstruções', f: (d) => num(d.vO) },
   { k: 'pA', h: 'Projetos', f: (d) => num(d.pA) },
   { k: 'cota', h: 'Cota por deputado/mês', f: (d) => reais(d.cota) },
+  { k: 'pix', h: 'Emenda Pix', f: (d) => pct(d.pix, 0) },
   { k: 'ppd', h: 'Projetos por deputado', f: (d) => dec(d.ppd) },
 ];
 
@@ -795,7 +977,7 @@ function desenharResumo(c) {
   if (c.P.deputado) {
     if (!c.dep) { p.textContent = rotuloRecorte(c) + ' não esteve em exercício no período escolhido.'; return; }
     const d = c.dep;
-    p.textContent = periodo + ', ' + d.nome + ' (' + d.p + '-' + d.uf + ') registrou presença em ' + num(d.sP) + ' de ' + qtd(d.sE, 'sessão deliberativa ocorrida', 'sessões deliberativas ocorridas') + ' durante o exercício do mandato (' + pct(d.pres) + (d.pctl != null ? '; percentil ' + fmtPctl(d.pctl) + ' da Câmara' : '') + '), votou em ' + pct(d.pvot) + ' das votações nominais e apresentou ' + qtd(d.pA, 'projeto', 'projetos') + ' como primeiro autor. ' + (c.cg && c.cg.totalDep.get(d.id) ? 'A cota parlamentar reembolsou ' + reais(c.cg.totalDep.get(d.id)) + ' em despesas do gabinete (' + reais(c.cg.mensal.get(d.id)) + ' por mês de mandato). ' : '');
+    p.textContent = periodo + ', ' + d.nome + ' (' + d.p + '-' + d.uf + ') registrou presença em ' + num(d.sP) + ' de ' + qtd(d.sE, 'sessão deliberativa ocorrida', 'sessões deliberativas ocorridas') + ' durante o exercício do mandato (' + pct(d.pres) + (d.pctl != null ? '; percentil ' + fmtPctl(d.pctl) + ' da Câmara' : '') + '), votou em ' + pct(d.pvot) + ' das votações nominais e apresentou ' + qtd(d.pA, 'projeto', 'projetos') + ' como primeiro autor. ' + (c.cg && c.cg.totalDep.get(d.id) ? 'A cota parlamentar reembolsou ' + reais(c.cg.totalDep.get(d.id)) + ' em despesas do gabinete (' + reais(c.cg.mensal.get(d.id)) + ' por mês de mandato). ' : '') + (c.ce && c.ce.total ? 'Nas emendas individuais ao Orçamento, foram ' + reais(c.ce.total) + ' empenhados e ' + reais(c.ce.pago) + ' pagos, ' + pct(c.ce.pix / c.ce.total, 0) + ' por transferência especial. ' : '');
     const a = el('a', 'cp-link', 'Perfil na Câmara'); a.href = 'https://www.camara.leg.br/deputados/' + encodeURIComponent(d.id); a.target = '_blank'; a.rel = 'noopener';
     p.append(a); return;
   }
@@ -820,6 +1002,9 @@ function desenharNumeros(c) {
   const kc = root.querySelector('[data-k="cota"]');
   if (c.cg) { kc.classList.remove('dash-skeleton'); set('cota', reaisC(c.cg.total)); set('cotaS', c.cg.pares ? reais(c.cg.total / c.cg.pares) + ' por deputado por mês de mandato' : ''); }
   else { set('cota', '—'); set('cotaS', dash.data('gastos_mes').status === 'error' ? 'não foi possível carregar' : ''); if (dash.data('gastos_mes').status !== 'loading') kc.classList.remove('dash-skeleton'); }
+  const ke = root.querySelector('[data-k="emen"]');
+  if (c.ce) { ke.classList.remove('dash-skeleton'); set('emen', c.ce.total ? reaisC(c.ce.total) : '—'); set('emenS', c.ce.total ? reaisC(c.ce.pago) + ' pagos · ' + pct(c.ce.pix / c.ce.total, 0) + ' por transferência especial' : 'nenhuma emenda individual no recorte'); }
+  else { set('emen', '—'); const st = dash.data('emendas').status; set('emenS', st === 'error' ? 'não foi possível carregar' : ''); if (st !== 'loading') ke.classList.remove('dash-skeleton'); }
 }
 
 /* ---------- páginas ---------- */
@@ -899,14 +1084,14 @@ function paginaProjetos(c) {
 }
 function paginaDeputados(c) {
   const T = notasTrabalho(c);
-  for (const d of c.deps) { const o = T.notas.get(d.id); d.nota = o ? o.nota : null; const a = c.cv && c.cv.porDep.get(d.id); d.fid = a ? a.fid : null; d.gov = a ? a.gov : null; d.cota = c.cg ? (c.cg.mensal.get(d.id) ?? null) : null; }
+  for (const d of c.deps) { const o = T.notas.get(d.id); d.nota = o ? o.nota : null; const a = c.cv && c.cv.porDep.get(d.id); d.fid = a ? a.fid : null; d.gov = a ? a.gov : null; d.cota = c.cg ? (c.cg.mensal.get(d.id) ?? null) : null; const em = c.ce && c.ce.porDep.get(d.id); d.emen = em ? em.porAno : null; d.pix = em ? em.ppix : null; }
   const q = semAcento(ui.q.trim());
   const lista = q ? c.deps.filter((d) => semAcento(d.nome).includes(q)) : c.deps;
   nota('tabDep', num(lista.length) + (lista.length === 1 ? ' deputado' : ' deputados') + ' com os filtros escolhidos. O percentil compara a presença de cada um com a de todos os ' + num(c.nPctl) + ' deputados da Câmara que estiveram em exercício em ao menos ' + qtd(c.minSess, 'sessão', 'sessões') + ' no período: percentil 80 quer dizer presença igual ou maior que a de 80% deles. Clique em um cabeçalho para ordenar e em uma linha para ver os números do deputado no alto da página.');
   tabela(caixa('tabDep'), lista, COLS_DEP, ui.sortDep, 'dep', c.P.deputado, 'dep');
 }
 function paginaPartidos(c) {
-  for (const a of c.parts) { const b = c.cv && c.cv.porPart.get(a.p); a.coesao = b ? b.fid : null; a.gov = b ? b.gov : null; a.cota = c.cg && c.cg.totalPart.get(a.p) ? c.cg.totalPart.get(a.p) / (c.cg.mesesPart.get(a.p) || 1) : null; }
+  for (const a of c.parts) { const b = c.cv && c.cv.porPart.get(a.p); a.coesao = b ? b.fid : null; a.gov = b ? b.gov : null; a.cota = c.cg && c.cg.totalPart.get(a.p) ? c.cg.totalPart.get(a.p) / (c.cg.mesesPart.get(a.p) || 1) : null; const em = c.ce && c.ce.porPart.get(a.p); a.pix = em && em.e ? em.pix / em.e : null; }
   tabela(caixa('tabPart'), c.parts.filter((a) => a.sE > 0 || a.pA > 0), COLS_PART, ui.sortPart, 'partido', c.P.partido, 'part');
 }
 function paginaTrabalho(c) {
@@ -949,7 +1134,7 @@ function paginaTrabalho(c) {
     })), { cor: C[0], max: 1 });
   }
 }
-const PAGINAS = { presenca: paginaPresenca, votacoes: paginaVotacoes, pauta: paginaPauta, projetos: paginaProjetos, gastos: paginaGastos, trabalho: paginaTrabalho, deputados: paginaDeputados, partidos: paginaPartidos, metodo: () => {} };
+const PAGINAS = { presenca: paginaPresenca, votacoes: paginaVotacoes, pauta: paginaPauta, projetos: paginaProjetos, gastos: paginaGastos, emendas: paginaEmendas, trabalho: paginaTrabalho, deputados: paginaDeputados, partidos: paginaPartidos, metodo: () => {} };
 
 function desenharPagina() {
   for (const b of root.querySelectorAll('.cp-tab')) { const on = b.dataset.tab === ui.tab; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; }
@@ -981,8 +1166,9 @@ root.addEventListener('click', (ev) => {
   }
   const peso = t.closest('[data-peso]'); if (peso) { ui.pesos[peso.dataset.peso] = +peso.dataset.v; return desenharPagina(); }
   const modo = t.closest('.cp-seg-b[data-modo]'); if (modo) { ui.modo = modo.dataset.modo; return desenharPagina(); }
+  const modoEm = t.closest('.cp-seg-b[data-modoem]'); if (modoEm) { ui.modoEm = modoEm.dataset.modoem; return desenharPagina(); }
   const ord = t.closest('.cp-th-b');
-  if (ord) { const s = { dep: ui.sortDep, part: ui.sortPart, obs: ui.sortObs, pauta: ui.sortPauta, det: ui.sortDet, forn: ui.sortForn }[ord.dataset.qual] || ui.sortPart; const k = ord.dataset.sort; if (s.k === k) s.dir = -s.dir; else { s.k = k; s.dir = (k === 'nome' || k === 'p' || k === 'uf') ? 1 : -1; } return desenharPagina(); }
+  if (ord) { const s = { dep: ui.sortDep, part: ui.sortPart, obs: ui.sortObs, pauta: ui.sortPauta, det: ui.sortDet, forn: ui.sortForn, dest: ui.sortDest, fav: ui.sortFav }[ord.dataset.qual] || ui.sortPart; const k = ord.dataset.sort; if (s.k === k) s.dir = -s.dir; else { s.k = k; s.dir = (k === 'nome' || k === 'p' || k === 'uf') ? 1 : -1; } return desenharPagina(); }
   if (t.closest('.cp-picked')) return dash.setParams({ deputado: null });
   if (t.closest('.cp-reset')) { ui.q = ''; $('.cp-busca').value = ''; return dash.resetParams(); }
   if (t.closest('a')) return;
@@ -1027,6 +1213,12 @@ dash.onData(() => {
     if (cache3.key !== k3) cache3 = { key: k3, G: prepGastos(fg[0].data, fg[1].data, fg[2].data) };
     ctx.cg = contextoGastos(ctx, cache3.G);
   } else ctx.cg = null;
+  const fe = FONTES_EMENDAS.map((id) => dash.data(id));
+  if (fe.every((x) => x.status === 'ok' && Array.isArray(x.data))) {
+    const k4 = fe.map((x) => x.data.length + JSON.stringify(x.data[0] || {})).join('|');
+    if (cache4.key !== k4) cache4 = { key: k4, E: prepEmendas(fe[0].data, fe[1].data, fe[2].data, fe[3].data, fe[4].data) };
+    ctx.ce = contextoEmendas(ctx, cache4.E);
+  } else ctx.ce = null;
   const meta = dash.data('meta');
   const fd = root.querySelector('.cp-fonte-data');
   if (meta.status === 'ok' && meta.data) {

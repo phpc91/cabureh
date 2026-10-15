@@ -150,11 +150,15 @@ def documento(codigo: str, tipo_favorecido: str) -> str:
 class Casador:
     """Liga o nome do autor (SIAFI) ao deputado, conferindo o exercício na época da emenda.
 
-    1. nome igual (sem acentos e pontuação) a algum nome que o deputado usou, entre os que estavam
-       em exercício entre julho do ano anterior à emenda e o fim do ano dela;
-    2. se não houver, comparação aproximada: um nome contido no outro (ignorando títulos como
-       Dr. e Pastor e sufixos como Júnior), com pelo menos duas palavras, candidato único e autor
-       que não seja homônimo de senador.
+    As emendas de um ano são apresentadas entre setembro e dezembro do ano anterior. Primeiro
+    procura quem estava em exercício nesse intervalo; se ninguém, aceita quem esteve em exercício
+    de julho do ano anterior ao fim do ano da emenda (caso de quem herdou emendas de outro).
+    Em cada janela:
+    1. nome igual (sem acentos e pontuação) a algum nome que o deputado usou;
+    2. se não houver, comparação aproximada: um nome contido no outro, ignorando títulos como
+       Dr. e Pastor e sufixos como Júnior, com candidato único e autor que não seja homônimo de
+       senador. Nomes de uma palavra só casam se ela tiver 6 letras ou mais e for a primeira ou a
+       última do nome do autor.
     """
 
     def __init__(self, deputados: dict[int, Deputado], senadores: set[str] | None):
@@ -165,16 +169,30 @@ class Casador:
         for d in deputados.values():
             ns = {norm(n) for n in (d.nomes | {d.nome}) if n}
             for n in ns:
-                self.por_nome[n].append(d.id)
-            self.toks[d.id] = [t for t in {tokens(n) for n in ns} if len(t) >= 2]
+                if d.id not in self.por_nome[n]:
+                    self.por_nome[n].append(d.id)
+            self.toks[d.id] = [t for t in {tokens(n) for n in ns} if t]
         self.cache: dict[tuple[str, int], int | None] = {}
         self.exatos: dict[str, int] = {}
         self.aproximados: dict[str, int] = {}
+        self.ambiguos: set[str] = set()
         self.nao_casados: dict[str, float] = defaultdict(float)
         self.de_senadores: dict[str, float] = defaultdict(float)
 
-    def _ativo(self, dep_id: int, ano: int) -> bool:
+    def _ativo(self, dep_id: int, ano: int, estreito: bool) -> bool:
+        if estreito:
+            return self.deputados[dep_id].exerceu_entre(f"{ano - 1}-09-01T00:00:00", f"{ano - 1}-12-31T23:59:59")
         return self.deputados[dep_id].exerceu_entre(f"{ano - 1}-07-01T00:00:00", f"{ano}-12-31T23:59:59")
+
+    @staticmethod
+    def _parecido(autor: str, t: frozenset[str], d: frozenset[str]) -> bool:
+        if len(d) >= 2 and len(t) >= 2:
+            return t <= d or d <= t
+        if len(d) == 1 and len(t) >= 2:
+            (u,) = d
+            partes = [p for p in autor.split() if p not in TITULOS]
+            return len(u) >= 6 and bool(partes) and u in (partes[0], partes[-1])
+        return False
 
     def __call__(self, nome_autor: str, ano: int) -> int | None:
         chave = (nome_autor, ano)
@@ -182,23 +200,34 @@ class Casador:
             return self.cache[chave]
         n = norm(titular(nome_autor))
         achado = None
-        exatos = [i for i in self.por_nome.get(n, ()) if self._ativo(i, ano)]
-        if len(set(exatos)) == 1:
-            achado = exatos[0]
-            self.exatos[n] = achado
-        elif not exatos and self.senadores is not None and n not in self.senadores and not self.por_nome.get(n):
+        homonimos = self.por_nome.get(n, [])
+        for estreito in (True, False):
+            exatos = [i for i in homonimos if self._ativo(i, ano, estreito)]
+            if len(exatos) == 1:
+                achado = exatos[0]
+                self.exatos[n] = achado
+                break
+            if len(exatos) > 1:
+                self.ambiguos.add(n)
+                break
+        if achado is None and not homonimos and self.senadores is not None and n not in self.senadores:
             t = tokens(n)
-            if len(t) >= 2:
-                cands = {i for i, ts in self.toks.items() for d in ts if (t <= d or d <= t) and self._ativo(i, ano)}
+            cands_todos = {i for i, ts in self.toks.items() if any(self._parecido(n, t, d) for d in ts)}
+            for estreito in (True, False):
+                cands = {i for i in cands_todos if self._ativo(i, ano, estreito)}
                 if len(cands) == 1:
                     achado = cands.pop()
                     self.aproximados[n] = achado
+                    break
+                if len(cands) > 1:
+                    self.ambiguos.add(n)
+                    break
         self.cache[chave] = achado
         return achado
 
     def anotar_falha(self, nome_autor: str, v: float) -> None:
         n = norm(titular(nome_autor))
-        if self.senadores is not None and n in self.senadores:
+        if self.senadores is not None and n in self.senadores and not self.por_nome.get(n):
             self.de_senadores[n] += v
         else:
             self.nao_casados[titular(nome_autor)] += v
@@ -355,6 +384,7 @@ def montar(fonte: Fonte, periodo: Periodo, deputados: dict[int, Deputado], legis
         "pago_no_periodo_sem_autor": round(sem_autor, 2),
         "autores_casados_exato": len(casar.exatos),
         "autores_casados_aproximado": {k: deputados[v].nome for k, v in sorted(casar.aproximados.items())},
+        "autores_ambiguos": sorted(casar.ambiguos),
         "autores_nao_casados": [f"{k} ({v / 1e6:.1f} mi)" for k, v in sorted(casar.nao_casados.items(), key=lambda x: -x[1])[:30]],
     }
     log.info("emendas: %s", {k: v for k, v in resumo.items() if not isinstance(v, (dict, list))})

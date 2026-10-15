@@ -12,6 +12,11 @@ export const FONTES = {
   gastos_mes: 'data/gastos-mes.csv',
   gastos_categoria: 'data/gastos-categoria.csv',
   fornecedores: 'data/fornecedores.csv',
+  emendas: 'data/emendas.csv',
+  emendas_destinos: 'data/emendas-destinos.csv',
+  emendas_mes: 'data/emendas-mes.csv',
+  emendas_favorecidos: 'data/emendas-favorecidos.csv',
+  emendas_tipos: 'data/emendas-tipos.csv',
   meta: 'data/meta.json',
 };
 
