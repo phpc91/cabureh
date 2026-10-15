@@ -125,7 +125,9 @@ def test_emendas_auxiliares():
     assert emendas.titular("JOSÉ") == "JOSÉ"
     assert emendas.valor("1.300.000,50") == 1300000.5 and emendas.valor("") == 0
     assert emendas.tipo("Emenda Individual - Transferências Especiais") == "Transferência especial"
-    assert emendas.destino("CAMPINAS - SP", "CAMPINAS", "SÃO PAULO") == ("CAMPINAS - SP", "SP")
+    assert emendas.destino("CAMPINAS - SP", "CAMPINAS", "SÃO PAULO") == ("Campinas - SP", "SP")
+    assert emendas.destino("MÚLTIPLO", "MÚLTIPLO", "SÃO PAULO") == ("Vários municípios - SP", "SP")
+    assert emendas.destino("DUQUE DE CAXIAS - RJ", "", "Sem informação") == ("Duque de Caxias - RJ", "RJ")
     assert emendas.destino("BAHIA (UF)", "Sem informação", "BAHIA") == ("Bahia (estado)", "BA")
     assert emendas.destino("Nacional", "", "Sem informação") == ("Nacional", "")
     assert emendas.documento("***.456.789-**", "Pessoa Fisica") == "Pessoa física"
@@ -156,7 +158,7 @@ def test_emendas(fonte):
     pf = next(f for f in fav if f["documento"] == "Pessoa física")
     assert pf["favorecido"] == "Pessoas físicas (agrupadas)" and "JOAO" not in str(pf)
     dest = {(d["id_deputado"], d["destino"]) for d in s.destinos}
-    assert (1, "CAMPINAS - SP") in dest and (2, "Bahia (estado)") in dest and (3, "Rio de Janeiro (estado)") in dest
+    assert (1, "Campinas - SP") in dest and (2, "Bahia (estado)") in dest and (3, "Vários municípios - RJ") in dest
 
 
 def test_casador_homonimos_e_janelas():

@@ -120,23 +120,30 @@ def area(funcao: str, tp: str) -> str:
     return f
 
 
+def nome_proprio(s: str) -> str:
+    """CAMPINAS -> Campinas; RIO DE JANEIRO -> Rio de Janeiro."""
+    partes = (s or "").strip().lower().split()
+    return " ".join(p if (i and p in {"de", "da", "do", "das", "dos", "e"}) else p[:1].upper() + p[1:] for i, p in enumerate(partes))
+
+
 def destino(localidade: str, municipio: str, uf_nome: str) -> tuple[str, str]:
     """(rótulo do destino, sigla da UF ou '')."""
     sigla = UFS.get(norm(uf_nome), "")
-    mun = (municipio or "").strip()
-    if mun and mun != "Sem informação" and sigla:
-        return f"{mun} - {sigla}", sigla
+    mun, loc = norm(municipio), norm(localidade)
     if sigla:
-        return f"{uf_nome.strip().title().replace(' Do ', ' do ').replace(' De ', ' de ')} (estado)", sigla
-    n = norm(localidade)
-    if "NACIONAL" in n:
+        if mun and mun not in {"MULTIPLO", "SEM INFORMACAO"}:
+            return f"{nome_proprio(municipio)} - {sigla}", sigla
+        if "MULTIPLO" in mun or "MULTIPLO" in loc:
+            return f"Vários municípios - {sigla}", sigla
+        return f"{nome_proprio(uf_nome)} (estado)", sigla
+    if "NACIONAL" in loc:
         return "Nacional", ""
-    if "MULTIPLO" in n:
+    if "MULTIPLO" in loc:
         return "Vários locais", ""
-    m = re.search(r"\b([A-Z]{2})$", (localidade or "").strip())
-    if m and m.group(1) in UFS.values():
-        return localidade.strip(), m.group(1)
-    return (localidade or "Sem informação").strip().title() or "Sem informação", ""
+    m = re.search(r"^(.*?)\s*-\s*([A-Z]{2})$", (localidade or "").strip())
+    if m and m.group(2) in UFS.values():
+        return f"{nome_proprio(m.group(1))} - {m.group(2)}", m.group(2)
+    return nome_proprio(localidade) or "Sem informação", ""
 
 
 def documento(codigo: str, tipo_favorecido: str) -> str:
@@ -354,7 +361,7 @@ def montar(fonte: Fonte, periodo: Periodo, deputados: dict[int, Deputado], legis
         if f is None:
             nome = "Pessoas físicas (agrupadas)" if pf else (fav or "").strip()
             f = forn[chave] = [0.0, 0, nome, doc, "" if pf else (nat or "").strip(), "" if pf else uf_fav.strip(),
-                               "" if pf else (mun_fav or "").strip().title()]
+                               "" if pf else nome_proprio(mun_fav)]
         f[0] += v
         f[1] += 1
     meses = [{"id_deputado": d, "mes": m, "partido": p, "tipo": tp, "valor": round(v, 2)}

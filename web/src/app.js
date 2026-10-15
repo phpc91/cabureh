@@ -620,7 +620,7 @@ function paginaEmendas(c) {
   const porDest = new Map();
   for (const r of ce.dest) { let a = porDest.get(r.dest); if (!a) { a = { chave: r.dest, dest: r.dest, uf: r.uf || '—', e: 0, pg: 0, deps: new Set() }; porDest.set(r.dest, a); } a.e += r.e; a.pg += r.pg; a.deps.add(r.id); }
   const dest = [...porDest.values()].map((a) => Object.assign(a, { nd: a.deps.size, exec: a.e ? a.pg / a.e : null })).sort((a, b) => b.e - a.e).slice(0, 60);
-  nota('emDest', (c.P.deputado ? 'Os principais destinos das emendas do deputado' : 'Os 60 principais destinos do recorte') + ', somando os dez maiores de cada deputado em cada ano. “Estado” indica emendas para o governo estadual ou sem município informado. ' + fmtPg(ce.total, ce.pago) + ' no total do recorte.');
+  nota('emDest', (c.P.deputado ? 'Os principais destinos das emendas do deputado' : 'Os 60 principais destinos do recorte') + ', somando os dez maiores de cada deputado em cada ano. “Vários municípios” reúne emendas distribuídas entre municípios do estado; “(estado)” indica o governo estadual. ' + fmtPg(ce.total, ce.pago) + ' no total do recorte.');
   tabela(caixa('emDest'), dest, [
     { k: 'dest', h: 'Destino', l: 1, wrap: 1, f: (d) => d.dest },
     { k: 'e', h: 'Empenhado', f: (d) => reais(d.e) },
