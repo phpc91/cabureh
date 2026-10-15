@@ -93,6 +93,19 @@ def tokens(nome_norm: str) -> frozenset[str]:
     return frozenset(t for t in nome_norm.split() if t not in TITULOS and len(t) > 1)
 
 
+PREFIXO_CARGO = re.compile(r"^(DEP|DEPUTAD[OA]|SEN|SENADOR[A]?) ")
+
+
+def nome_autor(nome: str) -> str:
+    """Nome normalizado de quem responde pela emenda, sem prefixo de cargo e com apelidos resolvidos."""
+    n = PREFIXO_CARGO.sub("", norm(titular(nome)))
+    return APELIDOS.get(n, n)
+
+
+def nome_autor_n(nome: str) -> str:  # alias: dentro do Casador, `nome_autor` é o nome do parâmetro
+    return nome_autor(nome)
+
+
 def titular(nome_autor: str) -> str:
     """Quem responde hoje pela emenda: 'FULANO (EX-PARLAMENTAR BELTRANO, NOS TERMOS ...)' -> FULANO."""
     m = EX_PARLAMENTAR.match(nome_autor or "")
@@ -204,8 +217,7 @@ class Casador:
         chave = (nome_autor, ano)
         if chave in self.cache:
             return self.cache[chave]
-        n = norm(titular(nome_autor))
-        n = APELIDOS.get(n, n)
+        n = nome_autor_n(nome_autor)
         achado = None
         homonimos = self.por_nome.get(n, [])
         for estreito in (True, False):
@@ -233,7 +245,7 @@ class Casador:
         return achado
 
     def anotar_falha(self, nome_autor: str, v: float) -> None:
-        n = norm(titular(nome_autor))
+        n = nome_autor_n(nome_autor)
         if self.senadores is not None and n in self.senadores:
             self.de_senadores[n] += v
         else:

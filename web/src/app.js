@@ -2,7 +2,24 @@
 export function iniciar(dash, d3) {
 const root = document.querySelector('.cp');
 const $ = (s) => root.querySelector(s);
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const SENADO = dash.casa === 'senado';
+// No Senado, os textos escritos para a Câmara são adaptados por estas trocas, em ordem.
+// Trechos entre ⟦ ⟧ já estão escritos para a casa certa e não são trocados.
+const TROCAS = [
+  [/Dados Abertos da Câmara dos Deputados/g, 'Dados Abertos do Senado Federal'], [/Câmara dos Deputados/g, 'Senado Federal'],
+  [/Câmara inteira/g, 'Senado inteiro'], [/\bda Câmara\b/g, 'do Senado'], [/\bna Câmara\b/g, 'no Senado'], [/\bà Câmara\b/g, 'ao Senado'],
+  [/\bpela Câmara\b/g, 'pelo Senado'], [/\ba Câmara\b/g, 'o Senado'], [/\bA Câmara\b/g, 'O Senado'], [/Câmara/g, 'Senado'],
+  [/deputados federais/g, 'senadores'], [/Deputados/g, 'Senadores'], [/Deputado/g, 'Senador'], [/deputados/g, 'senadores'],
+  [/deputada/g, 'senadora'], [/deputado/g, 'senador'],
+  [/sessões deliberativas/g, 'sessões com votação nominal'], [/sessão deliberativa/g, 'sessão com votação nominal'],
+];
+const tx = (s) => {
+  if (s == null) return s;
+  s = String(s);
+  if (!SENADO) return s.replace(/[⟦⟧]/g, '');
+  return s.split(/(⟦[^⟧]*⟧)/).map((p) => (p.startsWith('⟦') ? p.slice(1, -1) : TROCAS.reduce((a, [re, b]) => a.replace(re, b), p))).join('');
+};
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = tx(text); return e; };
 const nf = new Intl.NumberFormat('pt-BR');
 const num = (x) => nf.format(Math.round(x || 0));
 const dec = (x, d = 1) => (x == null || !isFinite(x)) ? '—' : x.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -22,7 +39,9 @@ let cache3 = { key: '', G: null };
 let cache2 = { key: '', V: null };
 const FATORES = [
   { k: 'pres', nome: 'Presença em plenário', desc: 'Presenças sobre sessões em exercício', v: (d) => d.pres, bom: 1, mostra: (d) => pct(d.pres) + ' de presença' },
-  { k: 'com', nome: 'Reuniões de comissão', desc: 'Comissões, audiências e outros eventos, por sessão em exercício', v: (d) => d.oE / d.sE, bom: 1, mostra: (d) => qtd(d.oE, 'reunião de comissão', 'reuniões de comissão') },
+  SENADO
+    ? { k: 'com', nome: 'Votos em comissões', desc: 'Votos registrados em votações de comissões, por sessão em exercício', v: (d) => d.cV / d.sE, bom: 1, mostra: (d) => qtd(d.cV, 'voto em comissão', 'votos em comissões') }
+    : { k: 'com', nome: 'Reuniões de comissão', desc: 'Comissões, audiências e outros eventos, por sessão em exercício', v: (d) => d.oE / d.sE, bom: 1, mostra: (d) => qtd(d.oE, 'reunião de comissão', 'reuniões de comissão') },
   { k: 'proj', nome: 'Projetos', desc: 'Como primeiro autor, por sessão em exercício', v: (d) => d.pA / d.sE, bom: 1, mostra: (d) => qtd(d.pA, 'projeto', 'projetos') },
   { k: 'coaut', nome: 'Coautorias', desc: 'Projetos assinados como coautor, por sessão em exercício', v: (d) => d.pC / d.sE, bom: 1, mostra: (d) => qtd(d.pC, 'coautoria', 'coautorias') },
   { k: 'abs', nome: 'Abstenções', desc: 'Parcela dos votos dados; menos é melhor', v: (d) => (d.vot ? d.vA / d.vot : 0), bom: -1, mostra: (d) => qtd(d.vA, 'abstenção', 'abstenções') },
@@ -132,6 +151,37 @@ const rotuloRecorte = (c) => {
   if (c.P.partido && c.P.uf) return c.P.partido + ' em ' + c.P.uf;
   return c.P.partido || c.P.uf || 'Câmara';
 };
+
+/* ---------- motivos das ausências (Senado) ---------- */
+const NCOM = 'Não compareceu';
+let cache5 = { key: '', A: null };
+function prepAusencias(rows) { return rows.map((r) => ({ id: String(r.id_deputado), m: String(r.mes), p: String(r.partido), mot: String(r.motivo), n: +r.sessoes || 0 })); }
+function contextoAusencias(c, A) {
+  const mset = new Set(c.meses);
+  const info = (id) => c.D.info.get(id) || {};
+  const doPeriodo = A.filter((r) => mset.has(r.m) && (!c.P.uf || info(r.id).uf === c.P.uf));
+  const rec = doPeriodo.filter((r) => (!c.P.partido || r.p === c.P.partido) && (!c.P.deputado || r.id === c.P.deputado));
+  const porDep = new Map();
+  for (const r of doPeriodo) { let a = porDep.get(r.id); if (!a) { a = { ncom: 0, just: 0 }; porDep.set(r.id, a); } if (r.mot === NCOM) a.ncom += r.n; else a.just += r.n; }
+  const ncom = d3.sum(rec, (r) => (r.mot === NCOM ? r.n : 0)), aus = d3.sum(rec, (r) => r.n);
+  return { rec, porDep, total: { aus, ncom, just: aus - ncom } };
+}
+function secaoAusencias(c) {
+  if (!SENADO) return;
+  if (!c.ca) { for (const k of ['motivos', 'ncom']) { const b = caixa(k); b.classList.remove('dash-skeleton'); b.replaceChildren(el('p', 'cp-card-n', dash.data('ausencias').status === 'error' ? 'Não foi possível carregar os motivos.' : 'Carregando motivos…')); } return; }
+  for (const k of ['motivos', 'ncom']) caixa(k).classList.remove('dash-skeleton');
+  const por = d3.rollups(c.ca.rec, (rs) => d3.sum(rs, (r) => r.n), (r) => r.mot).sort((a, b) => (a[0] === NCOM) - (b[0] === NCOM) || b[1] - a[1]);
+  const tot = d3.sum(por, (x) => x[1]) || 1;
+  nota('motivos', 'Sessões com votação nominal em que ' + (c.P.deputado ? 'o senador' : 'senadores do recorte') + ' não votaram nem registraram presença, pelo motivo informado. Atividade parlamentar é declarada pelo próprio senador; “não compareceu” é a falta sem justificativa.');
+  barras(caixa('motivos'), por.map(([k, v]) => ({ chave: k, rotulo: k, valor: v, texto: num(v) + ' · ' + pct(v / tot, 0), tip: () => [{ h: k }, { k: 'Sessões', v: num(v) }, { k: 'Das ausências', v: pct(v / tot) }] })),
+    { cor: C[0], vazio: 'Nenhuma ausência com os filtros escolhidos.' });
+  for (const b of caixa('motivos').querySelectorAll('.cp-hb')) if (b.querySelector('.cp-hb-l').textContent === NCOM) b.querySelector('.cp-hb-f').style.background = 'var(--color-bad)';
+  const lista = c.deps.filter((d) => d.sE >= c.minSess).map((d) => Object.assign(d, { ncom: (c.ca.porDep.get(d.id) || {}).ncom || 0, just: (c.ca.porDep.get(d.id) || {}).just || 0 }))
+    .filter((d) => d.ncom > 0).sort((a, b) => b.ncom - a.ncom || b.ncom / b.sE - a.ncom / a.sE).slice(0, 15);
+  nota('ncom', criterio(c) + ' Sessões em que o senador estava em exercício e foi registrado como “não compareceu”.');
+  const max = lista.length ? lista[0].ncom : 1;
+  ranking(caixa('ncom'), lista, { rotulo: 'Faltas', valor: (d) => num(d.ncom), sub: (d) => pct(d.ncom / d.sE) + ' das ' + num(d.sE) + ' sessões · ' + qtd(d.just, 'ausência justificada', 'ausências justificadas'), bar: (d) => d.ncom / max, vazio: 'Nenhuma falta sem justificativa com os filtros escolhidos.' }, c);
+}
 
 /* ---------- votações, pauta e alinhamento ---------- */
 const FONTES_VOT = ['pauta', 'partidos_votacao', 'alinhamento'];
@@ -262,7 +312,7 @@ function agregaProps(cv, c) {
   return lista;
 }
 const fmtData = (d) => d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : '—';
-const linkProp = (pid) => (pid ? 'https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=' + encodeURIComponent(pid) : null);
+const linkProp = (pid) => (!pid ? null : SENADO ? 'https://www25.senado.leg.br/web/atividade/materias/-/materia/' + encodeURIComponent(pid) : 'https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=' + encodeURIComponent(pid));
 function paginaPauta(c) {
   const keys = ['temas', 'etapas', 'obstTema', 'props'];
   if (!c.cv) return aguardandoVot(keys);
@@ -580,7 +630,7 @@ function paginaEmendas(c) {
   // por ano: Câmara inteira mostra todos os tipos (inclusive de senadores e coletivas); recorte mostra as individuais dele
   if (!c.filtrado) {
     const series = TIPOS_EMENDA.map((t) => ({ nome: t.nome, cor: t.cor, valores: ce.anos.map((a) => d3.sum(ce.tipos, (r) => (r.ano === a && r.tipo === t.k ? r.e : 0))) })).filter((s) => d3.sum(s.valores) > 0);
-    nota('emAno', 'Valor empenhado em todas as emendas do Orçamento, por ano, inclusive as de senadores e as coletivas. Só as individuais têm um deputado como autor.');
+    nota('emAno', 'Valor empenhado em todas as emendas do Orçamento, por ano, inclusive as ⟦' + (SENADO ? 'de deputados' : 'de senadores') + '⟧ e as coletivas. Só as individuais têm um deputado como autor.');
     legenda('emAno', series.map((s) => ({ nome: s.nome, c: s.cor })));
     colunasAno(caixa('emAno'), ce.anos, series, reais, reaisC, 'Nenhuma emenda nos anos escolhidos.');
   } else {
@@ -937,7 +987,7 @@ const COLS_DEP = [
   { k: 'vO', h: 'Obstruções', f: (d) => num(d.vO) },
   { k: 'pA', h: 'Projetos', f: (d) => num(d.pA) },
   { k: 'pC', h: 'Coautorias', f: (d) => num(d.pC) },
-  { k: 'oE', h: 'Reuniões de comissão', f: (d) => num(d.oE) },
+  ...(SENADO ? [{ k: 'ncom', h: 'Faltas sem justificativa', f: (d) => num(d.ncom) }, { k: 'cV', h: 'Votos em comissões', f: (d) => num(d.cV) }] : [{ k: 'oE', h: 'Reuniões de comissão', f: (d) => num(d.oE) }]),
 ];
 const COLS_PART = [
   { k: 'p', h: 'Partido', l: 1, f: (d) => d.p },
@@ -975,27 +1025,28 @@ function desenharResumo(c) {
   const p = $('.cp-takeaway'); const t = c.tot;
   const periodo = c.de === c.ate ? 'Em ' + mesNome(c.de) : 'De ' + mesNome(c.de) + ' a ' + mesNome(c.ate);
   if (c.P.deputado) {
-    if (!c.dep) { p.textContent = rotuloRecorte(c) + ' não esteve em exercício no período escolhido.'; return; }
+    if (!c.dep) { p.textContent = tx(rotuloRecorte(c) + ' não esteve em exercício no período escolhido.'); return; }
     const d = c.dep;
-    p.textContent = periodo + ', ' + d.nome + ' (' + d.p + '-' + d.uf + ') registrou presença em ' + num(d.sP) + ' de ' + qtd(d.sE, 'sessão deliberativa ocorrida', 'sessões deliberativas ocorridas') + ' durante o exercício do mandato (' + pct(d.pres) + (d.pctl != null ? '; percentil ' + fmtPctl(d.pctl) + ' da Câmara' : '') + '), votou em ' + pct(d.pvot) + ' das votações nominais e apresentou ' + qtd(d.pA, 'projeto', 'projetos') + ' como primeiro autor. ' + (c.cg && c.cg.totalDep.get(d.id) ? 'A cota parlamentar reembolsou ' + reais(c.cg.totalDep.get(d.id)) + ' em despesas do gabinete (' + reais(c.cg.mensal.get(d.id)) + ' por mês de mandato). ' : '') + (c.ce && c.ce.total ? 'Nas emendas individuais ao Orçamento, foram ' + reais(c.ce.total) + ' empenhados e ' + reais(c.ce.pago) + ' pagos, ' + pct(c.ce.pix / c.ce.total, 0) + ' por transferência especial. ' : '');
-    const a = el('a', 'cp-link', 'Perfil na Câmara'); a.href = 'https://www.camara.leg.br/deputados/' + encodeURIComponent(d.id); a.target = '_blank'; a.rel = 'noopener';
+    p.textContent = tx(periodo + ', ⟦' + d.nome + '⟧ (' + d.p + '-' + d.uf + ') registrou presença em ' + num(d.sP) + ' de ' + qtd(d.sE, 'sessão deliberativa ocorrida', 'sessões deliberativas ocorridas') + ' durante o exercício do mandato (' + pct(d.pres) + (d.pctl != null ? '; percentil ' + fmtPctl(d.pctl) + ' da Câmara' : '') + '), votou em ' + pct(d.pvot) + ' das votações nominais e apresentou ' + qtd(d.pA, 'projeto', 'projetos') + ' como primeiro autor. ' + (c.cg && c.cg.totalDep.get(d.id) ? 'A cota parlamentar reembolsou ' + reais(c.cg.totalDep.get(d.id)) + ' em despesas do gabinete (' + reais(c.cg.mensal.get(d.id)) + ' por mês de mandato). ' : '') + (c.ce && c.ce.total ? 'Nas emendas individuais ao Orçamento, foram ' + reais(c.ce.total) + ' empenhados e ' + reais(c.ce.pago) + ' pagos, ' + pct(c.ce.pix / c.ce.total, 0) + ' por transferência especial. ' : ''));
+    const a = el('a', 'cp-link', 'Perfil na Câmara'); a.href = SENADO ? 'https://www25.senado.leg.br/web/senadores/senador/-/perfil/' + encodeURIComponent(d.id) : 'https://www.camara.leg.br/deputados/' + encodeURIComponent(d.id); a.target = '_blank'; a.rel = 'noopener';
     p.append(a); return;
   }
-  if (!t.sE) { p.textContent = 'Não houve sessão deliberativa com os filtros escolhidos.'; return; }
+  if (!t.sE) { p.textContent = tx('Não houve sessão deliberativa com os filtros escolhidos.'); return; }
   const quem = c.P.partido && c.P.uf ? 'os deputados do ' + c.P.partido + ' em ' + c.P.uf : c.P.partido ? 'os deputados do ' + c.P.partido : c.P.uf ? 'os deputados de ' + c.P.uf : 'os deputados';
   let s = periodo + ', ' + quem + ' registraram presença em ' + pct(t.pres) + ' das vezes em que eram esperados nas ' + num(c.nSess) + ' sessões deliberativas do Plenário. ';
   const ps = partidosComBancada(c).sort((a, b) => b.taus - a.taus);
   if (!c.P.partido && ps.length > 1) s += ps[0].p + ' teve a maior taxa de ausência entre os partidos (' + pct(ps[0].taus) + ') e ' + ps[ps.length - 1].p + ', a menor (' + pct(ps[ps.length - 1].taus) + ').';
   else { const top = c.deps.filter((d) => d.sE >= c.minSess).sort((a, b) => b.aus - a.aus)[0]; if (top && top.aus > 0) s += 'Quem mais se ausentou foi ' + top.nome + ', com ' + qtd(top.aus, 'ausência', 'ausências') + ' em ' + qtd(top.sE, 'sessão', 'sessões') + '.'; }
-  p.textContent = s;
+  if (SENADO && c.ca && !c.P.partido) { const a = c.ca.total; if (a.aus) s += ' ' + pct(a.just / a.aus, 0) + ' das ausências tiveram justificativa (atividade parlamentar, missão ou licença); ' + qtd(a.ncom, 'foi falta', 'foram faltas') + ' sem justificativa.'; }
+  p.textContent = tx(s);
 }
 function desenharNumeros(c) {
   const t = c.tot, tem = t.sE > 0 || t.vE > 0 || t.pA > 0;
-  const set = (k, v) => { root.querySelector('[data-k="' + k + '"]').textContent = v; };
+  const set = (k, v) => { root.querySelector('[data-k="' + k + '"]').textContent = tx(v); };
   set('pres', t.sE ? pct(t.pres) : '—');
   const subPres = t.sE ? qtd(t.sP, 'presença', 'presenças') + ' em ' + qtd(t.sE, 'esperada', 'esperadas') : '';
   set('presS', c.dep && c.dep.sE ? (c.dep.pctl != null ? 'Percentil ' + fmtPctl(c.dep.pctl) + ' da Câmara · ' + subPres : subPres + ' · sem percentil: abaixo do mínimo de sessões') : subPres);
-  set('aus', t.sE ? num(t.aus) : '—'); set('ausS', 'em ' + qtd(c.nSess, 'sessão deliberativa', 'sessões deliberativas'));
+  set('aus', t.sE ? num(t.aus) : '—'); set('ausS', 'em ' + qtd(c.nSess, 'sessão deliberativa', 'sessões deliberativas') + (SENADO && c.ca && c.ca.total.aus ? ' · ' + pct(c.ca.total.just / c.ca.total.aus, 0) + ' justificadas' : ''));
   set('vot', t.vE ? pct(t.pvot) : '—'); set('votS', qtd(c.nVot, 'votação nominal', 'votações nominais') + ' no Plenário');
   set('abs', tem ? num(t.vA) : '—'); set('absS', tem ? 'e ' + qtd(t.vO, 'obstrução', 'obstruções') : '');
   set('proj', tem ? num(t.pA) : '—'); set('projS', tem ? 'como primeiro autor, mais ' + qtd(t.pC, 'coautoria', 'coautorias') : '');
@@ -1009,12 +1060,12 @@ function desenharNumeros(c) {
 
 /* ---------- páginas ---------- */
 const caixa = (k) => root.querySelector('[data-c="' + k + '"]');
-const nota = (k, s) => { root.querySelector('[data-n="' + k + '"]').textContent = s; };
+const nota = (k, s) => { root.querySelector('[data-n="' + k + '"]').textContent = tx(s); };
 const alternarPartido = (p) => dash.setParams({ partido: lerFiltros().partido === p ? null : p, deputado: null });
 const criterio = (c) => (c.P.minimo > 0 ? 'Entre quem esteve em exercício em ao menos ' + num(c.minSess) + ' das ' + num(c.nSess) + ' sessões do período.' : 'Entre todos os que estiveram em exercício no período.');
 function legenda(k, itens) {
   const box = root.querySelector('[data-leg="' + k + '"]'); box.hidden = itens.length < 2;
-  box.replaceChildren(...itens.map((it) => { const s = el('span', 'cp-legend-i'), sw = el('span', 'cp-sw' + (it.line ? ' cp-sw-line' : '')); sw.style.background = it.c; s.append(sw, document.createTextNode(it.nome)); return s; }));
+  box.replaceChildren(...itens.map((it) => { const s = el('span', 'cp-legend-i'), sw = el('span', 'cp-sw' + (it.line ? ' cp-sw-line' : '')); sw.style.background = it.c; s.append(sw, document.createTextNode(tx(it.nome))); return s; }));
 }
 function paginaPresenca(c) {
   const mes = porMes(c.slice, c.meses), ref = c.filtrado ? porMes(c.base, c.meses) : null;
@@ -1037,7 +1088,7 @@ function paginaPresenca(c) {
 
   const elegiveis = c.deps.filter((d) => d.sE >= c.minSess);
   const ausentes = [...elegiveis].sort((a, b) => (taxa ? b.taus - a.taus || b.aus - a.aus : b.aus - a.aus || b.taus - a.taus)).slice(0, 15);
-  nota('ausentes', criterio(c) + ' A fonte não distingue faltas justificadas.');
+  nota('ausentes', criterio(c) + (SENADO ? ' Inclui ausências justificadas; os motivos estão nos cards abaixo.' : ' A fonte não distingue faltas justificadas.'));
   const maxAus = d3.max(ausentes, (d) => d.aus) || 1;
   ranking(caixa('ausentes'), ausentes, taxa
     ? { rotulo: 'Taxa de ausência', valor: (d) => pct(d.taus), sub: (d) => qtd(d.aus, 'ausência', 'ausências') + ' em ' + qtd(d.sE, 'sessão', 'sessões'), bar: (d) => d.taus }
@@ -1045,10 +1096,11 @@ function paginaPresenca(c) {
   const presentes = [...elegiveis].sort((a, b) => b.pres - a.pres || b.sE - a.sE || a.nome.localeCompare(b.nome, 'pt')).slice(0, 15);
   nota('presentes', criterio(c) + ' Em caso de empate, vem primeiro quem teve mais sessões.');
   ranking(caixa('presentes'), presentes, { rotulo: 'Presença', valor: (d) => pct(d.pres), sub: (d) => num(d.sP) + ' de ' + num(d.sE) + ' sessões · percentil ' + fmtPctl(d.pctl) }, c);
+  secaoAusencias(c);
 }
 const TIPOS_VOTO = [
   { k: 'vS', nome: 'Sim', cor: C[0] }, { k: 'vN', nome: 'Não', cor: C[1] }, { k: 'vA', nome: 'Abstenção', cor: C[2] },
-  { k: 'vO', nome: 'Obstrução', cor: C[3] }, { k: 'vX', nome: 'Outros registros', cor: C[4] }, { k: 'nvot', nome: 'Não votou', cor: MUTED },
+  { k: 'vO', nome: 'Obstrução', cor: C[3] }, { k: 'vX', nome: SENADO ? 'Voto secreto ou da Presidência' : 'Outros registros', cor: C[4] }, { k: 'nvot', nome: 'Não votou', cor: MUTED },
 ];
 function paginaVotacoes(c) {
   secaoObstrucao(c);
@@ -1084,7 +1136,7 @@ function paginaProjetos(c) {
 }
 function paginaDeputados(c) {
   const T = notasTrabalho(c);
-  for (const d of c.deps) { const o = T.notas.get(d.id); d.nota = o ? o.nota : null; const a = c.cv && c.cv.porDep.get(d.id); d.fid = a ? a.fid : null; d.gov = a ? a.gov : null; d.cota = c.cg ? (c.cg.mensal.get(d.id) ?? null) : null; const em = c.ce && c.ce.porDep.get(d.id); d.emen = em ? em.porAno : null; d.pix = em ? em.ppix : null; }
+  for (const d of c.deps) { const o = T.notas.get(d.id); d.nota = o ? o.nota : null; const a = c.cv && c.cv.porDep.get(d.id); d.fid = a ? a.fid : null; d.gov = a ? a.gov : null; d.cota = c.cg ? (c.cg.mensal.get(d.id) ?? null) : null; const em = c.ce && c.ce.porDep.get(d.id); d.emen = em ? em.porAno : null; d.pix = em ? em.ppix : null; if (SENADO) d.ncom = c.ca ? ((c.ca.porDep.get(d.id) || {}).ncom || 0) : null; }
   const q = semAcento(ui.q.trim());
   const lista = q ? c.deps.filter((d) => semAcento(d.nome).includes(q)) : c.deps;
   nota('tabDep', num(lista.length) + (lista.length === 1 ? ' deputado' : ' deputados') + ' com os filtros escolhidos. O percentil compara a presença de cada um com a de todos os ' + num(c.nPctl) + ' deputados da Câmara que estiveram em exercício em ao menos ' + qtd(c.minSess, 'sessão', 'sessões') + ' no período: percentil 80 quer dizer presença igual ou maior que a de 80% deles. Clique em um cabeçalho para ordenar e em uma linha para ver os números do deputado no alto da página.');
@@ -1154,7 +1206,7 @@ function semDados(status) {
 }
 
 /* ---------- eventos ---------- */
-function abrirAba(t, marcarLink) { if (!PAGINAS[t]) return; ui.tab = t; desenharPagina(); if (marcarLink) dash.setLink(t); }
+function abrirAba(t, marcarLink) { if (!PAGINAS[t]) return; ui.tab = t; desenharPagina(); if (marcarLink) { dash.setLink(t); linksCasa(); } }
 function escolherDeputado(id) { dash.setParams({ deputado: lerFiltros().deputado === id ? null : id }); root.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
 root.addEventListener('click', (ev) => {
   const t = ev.target;
@@ -1190,6 +1242,26 @@ $('.cp-f-min').addEventListener('change', (ev) => dash.setParams({ minimo: Numbe
 $('.cp-busca-pauta').addEventListener('input', (ev) => { ui.qPauta = ev.target.value; if (ctx && ui.tab === 'pauta') paginaPauta(ctx); });
 $('.cp-busca').addEventListener('input', (ev) => { ui.q = ev.target.value; if (ctx && ui.tab === 'deputados') paginaDeputados(ctx); });
 
+/* ---------- casa legislativa ---------- */
+for (const e of root.querySelectorAll('[data-casa]')) e.hidden = e.dataset.casa !== dash.casa;
+if (SENADO) {
+  document.title = 'Presença no Senado';
+  const andar = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentElement.closest('[data-casa], [data-notx]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+  const nos = []; while (andar.nextNode()) nos.push(andar.currentNode);
+  for (const n of nos) { const t = tx(n.nodeValue); if (t !== n.nodeValue) n.nodeValue = t; }
+  for (const e of root.querySelectorAll('[placeholder], [aria-label]')) for (const a of ['placeholder', 'aria-label']) if (e.hasAttribute(a)) e.setAttribute(a, tx(e.getAttribute(a)));
+} else document.title = 'Presença na Câmara';
+function linksCasa() {
+  const q = new URLSearchParams(location.search); q.delete('deputado'); q.delete('casa');
+  for (const a of root.querySelectorAll('[data-casa-link]')) {
+    const qq = new URLSearchParams(q); if (a.dataset.casaLink === 'senado') qq.set('casa', 'senado');
+    const s = qq.toString(); a.href = './' + (s ? '?' + s : '') + location.hash;
+    if (a.dataset.casaLink === dash.casa) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  }
+}
+linksCasa();
+window.addEventListener('hashchange', linksCasa);
+
 const inicial = (location.hash || '').slice(1);
 if (PAGINAS[inicial]) ui.tab = inicial;
 
@@ -1213,6 +1285,14 @@ dash.onData(() => {
     if (cache3.key !== k3) cache3 = { key: k3, G: prepGastos(fg[0].data, fg[1].data, fg[2].data) };
     ctx.cg = contextoGastos(ctx, cache3.G);
   } else ctx.cg = null;
+  if (SENADO) {
+    const fa = dash.data('ausencias');
+    if (fa.status === 'ok' && Array.isArray(fa.data)) {
+      const k5 = fa.data.length + JSON.stringify(fa.data[0] || {});
+      if (cache5.key !== k5) cache5 = { key: k5, A: prepAusencias(fa.data) };
+      ctx.ca = contextoAusencias(ctx, cache5.A);
+    } else ctx.ca = null;
+  }
   const fe = FONTES_EMENDAS.map((id) => dash.data(id));
   if (fe.every((x) => x.status === 'ok' && Array.isArray(x.data))) {
     const k4 = fe.map((x) => x.data.length + JSON.stringify(x.data[0] || {})).join('|');
@@ -1226,6 +1306,6 @@ dash.onData(() => {
     const hora = isNaN(quando) ? '' : quando.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
     fd.textContent = 'Cobre de ' + fmtData(m.periodo.inicio) + ' a ' + fmtData(m.periodo.fim) + '; última votação registrada em ' + fmtData(m.ultima_votacao) + '. Atualizado em ' + hora + '.';
   } else fd.textContent = '';
-  desenharFiltros(ctx); desenharResumo(ctx); desenharNumeros(ctx); desenharPagina();
+  desenharFiltros(ctx); desenharResumo(ctx); desenharNumeros(ctx); desenharPagina(); linksCasa();
 });
 }

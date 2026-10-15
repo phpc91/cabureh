@@ -3,21 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Presença na Câmara</title>
+  <title>Presença no Congresso</title>
   <meta name="author" content="phpc91">
   <link rel="license" href="https://creativecommons.org/licenses/by-nc/4.0/">
-  <meta name="description" content="Presença, votações, pauta, gastos, emendas e trabalho dos deputados federais, a partir dos Dados Abertos da Câmara dos Deputados e do Portal da Transparência.">
-  <meta property="og:title" content="Presença na Câmara">
-  <meta property="og:description" content="Presença, votações, gastos, emendas e trabalho dos deputados federais, atualizados todos os dias a partir de dados públicos.">
+  <meta name="description" content="Presença, votações, pauta, gastos, emendas e trabalho de deputados e senadores, a partir dos dados abertos da Câmara, do Senado e do Portal da Transparência.">
+  <meta property="og:title" content="Presença no Congresso">
+  <meta property="og:description" content="Presença, votações, gastos, emendas e trabalho de deputados e senadores, atualizados todos os dias a partir de dados públicos.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='17' width='6' height='12' rx='1.5' fill='%232a78d6'/%3E%3Crect x='13' y='9' width='6' height='20' rx='1.5' fill='%232a78d6'/%3E%3Crect x='23' y='4' width='6' height='25' rx='1.5' fill='%232a78d6'/%3E%3C/svg%3E">
 </head>
 <body>
 <div id="dash-root">
 <div class="cp">
   <header class="cp-head">
+    <nav class="cp-casa" aria-label="Casa legislativa">
+      <a class="cp-casa-b" data-casa-link="camara" href="./">Câmara</a>
+      <a class="cp-casa-b" data-casa-link="senado" href="./?casa=senado">Senado</a>
+    </nav>
     <h1 class="cp-title">Presença na Câmara</h1>
     <p class="cp-takeaway" id="resumo" data-source="presenca">—</p>
-    <p class="cp-fonte" id="fonte" data-source="pauta">Fonte: <a class="cp-link" href="https://dadosabertos.camara.leg.br" target="_blank" rel="noopener">Dados Abertos da Câmara dos Deputados</a>. <span class="cp-fonte-data"></span> Os números medem atividade registrada; veja a aba Como ler antes de tirar conclusões.</p>
+    <p class="cp-fonte" id="fonte" data-source="pauta">Fonte: <span data-casa="camara"><a class="cp-link" href="https://dadosabertos.camara.leg.br" target="_blank" rel="noopener">Dados Abertos da Câmara dos Deputados</a></span><span data-casa="senado" hidden><a class="cp-link" href="https://legis.senado.leg.br/dadosabertos" target="_blank" rel="noopener">Dados Abertos do Senado Federal</a></span>. <span class="cp-fonte-data"></span> Os números medem atividade registrada; veja a aba Como ler antes de tirar conclusões.</p>
   </header>
 
   <div class="cp-filters" id="filtros">
@@ -102,6 +106,19 @@
         <h2 class="cp-card-h">Deputados mais presentes</h2>
         <p class="cp-card-n" data-n="presentes"></p>
         <div class="cp-box dash-skeleton" data-c="presentes"></div>
+      </div>
+    </div>
+
+    <div class="cp-grid cp-grid-2" data-casa="senado" hidden>
+      <div class="cp-card" id="motivos-ausencia">
+        <h2 class="cp-card-h">Motivos das ausências</h2>
+        <p class="cp-card-n" data-n="motivos"></p>
+        <div class="cp-box dash-skeleton" data-c="motivos"></div>
+      </div>
+      <div class="cp-card" id="nao-compareceu">
+        <h2 class="cp-card-h">Mais faltas sem justificativa</h2>
+        <p class="cp-card-n" data-n="ncom"></p>
+        <div class="cp-box dash-skeleton" data-c="ncom"></div>
       </div>
     </div>
   </section>
@@ -366,7 +383,29 @@
   </section>
 
   <section class="cp-page" id="metodo" role="tabpanel" hidden>
-    <div class="cp-card">
+    <div class="cp-card" data-casa="senado" hidden>
+      <div class="cp-prose">
+        <h2 class="cp-prose-h">De onde vêm os números</h2>
+        <p class="cp-prose-p">Os dados do Senado vêm da API de Dados Abertos do Senado Federal: votações nominais do Plenário com o registro de cada senador, orientação das lideranças, autoria das matérias e votações em comissões. A cota parlamentar vem do portal de transparência do Senado, e as emendas, do Portal da Transparência da CGU. O período cobre os quatro anos anteriores à montagem do painel.</p>
+        <h2 class="cp-prose-h">Presença</h2>
+        <p class="cp-prose-p">O Senado não publica lista de presença por sessão. Em cada votação nominal, porém, todos os senadores em exercício aparecem com o voto ou com o motivo de não terem votado. Aqui, uma sessão conta como presença quando o senador votou ou registrou presença em ao menos uma votação nominal dela. Por isso só entram as sessões com votação nominal; sessões apenas de debates ou com votações simbólicas não aparecem.</p>
+        <h2 class="cp-prose-h">Ausências e justificativas</h2>
+        <p class="cp-prose-p">Quando o senador não participa de nenhuma votação da sessão, vale o motivo registrado: atividade parlamentar, missão oficial, licença saúde, licença particular ou outros afastamentos previstos no Regimento. “Não compareceu” é a falta sem justificativa e prevalece sobre os demais motivos na mesma sessão. A justificativa de atividade parlamentar é declarada pelo próprio senador. A taxa de presença conta todas as ausências; o card de motivos e o ranking de faltas sem justificativa mostram a outra leitura. Quem estava afastado do exercício, como no caso de senadores licenciados para assumir ministérios, não é esperado.</p>
+        <h2 class="cp-prose-h">Votações</h2>
+        <p class="cp-prose-p">Mais da metade das votações nominais do Senado é secreta, sobretudo a escolha de autoridades e embaixadores. Nelas só se sabe que o senador votou, não o voto; entram na participação, mas não em fidelidade, alinhamento ou abstenções. Votar com a bancada é votar como a maioria do próprio partido, entre partidos com ao menos três votantes. O alinhamento ao governo usa a orientação do líder do governo quando ela foi Sim ou Não.</p>
+        <h2 class="cp-prose-h">Pauta</h2>
+        <p class="cp-prose-p">O Senado não classifica as matérias por tema. Como projetos de lei, de lei complementar, emendas constitucionais e medidas provisórias têm numeração única no Congresso desde 2019, o tema vem da classificação da Câmara para o mesmo projeto, quando ele já passou por lá. Indicações de autoridades e requerimentos têm grupos próprios.</p>
+        <h2 class="cp-prose-h">Projetos e comissões</h2>
+        <p class="cp-prose-p">Entram projetos de lei, de lei complementar, de decreto legislativo, de resolução e propostas de emenda à Constituição. O primeiro nome na autoria é o autor; os demais são coautores. Como não há registro de presença em comissões, a atividade em comissões é medida pelos votos registrados em votações nas comissões.</p>
+        <h2 class="cp-prose-h">Cota parlamentar</h2>
+        <p class="cp-prose-p">A Cota para o Exercício da Atividade Parlamentar dos Senadores (CEAPS) reembolsa despesas do gabinete. O arquivo identifica o senador só pelo nome, que é ligado ao cadastro do Senado. As categorias do Senado são mais agregadas que as da Câmara, como locomoção, hospedagem e alimentação num mesmo grupo. Fornecedores pessoa física aparecem só pelo nome.</p>
+        <h2 class="cp-prose-h">Emendas parlamentares</h2>
+        <p class="cp-prose-p">As emendas vêm do Portal da Transparência e são ligadas ao senador pelo nome, conferindo que ele estava em exercício quando a emenda foi apresentada, do mesmo jeito que na Câmara. Emendas de deputados, de bancada estadual, de comissão e de relator aparecem só no gráfico anual do Congresso inteiro.</p>
+        <h2 class="cp-prose-h">Partidos</h2>
+        <p class="cp-prose-p">Cada sessão e voto é atribuído ao partido registrado na votação. Quem trocou de legenda aparece nos dois partidos, cada um com o seu trecho.</p>
+      </div>
+    </div>
+    <div class="cp-card" data-casa="camara">
       <div class="cp-prose">
         <h2 class="cp-prose-h">De onde vêm os números</h2>
         <p class="cp-prose-p">Quase tudo vem dos Dados Abertos da Câmara dos Deputados; as emendas vêm do Portal da Transparência. Da Câmara saem listas de presença dos eventos, votos das votações nominais, autoria das proposições e o histórico de exercício de cada deputado. O período cobre os quatro anos anteriores à montagem do painel.</p>
@@ -403,9 +442,10 @@
   </section>
 </div>
 
-<footer class="cp-rodape">
-  Projeto independente, sem vínculo com a Câmara dos Deputados. Dados públicos coletados diariamente de
-  <a class="cp-link" href="https://dadosabertos.camara.leg.br" target="_blank" rel="noopener">dadosabertos.camara.leg.br</a> e
+<footer class="cp-rodape" data-notx>
+  Projeto independente, sem vínculo com a Câmara dos Deputados ou o Senado Federal. Dados públicos coletados diariamente de
+  <a class="cp-link" href="https://dadosabertos.camara.leg.br" target="_blank" rel="noopener">dadosabertos.camara.leg.br</a>,
+  <a class="cp-link" href="https://legis.senado.leg.br/dadosabertos" target="_blank" rel="noopener">legis.senado.leg.br</a> e
   <a class="cp-link" href="https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares" target="_blank" rel="noopener">portaldatransparencia.gov.br</a>.
   <br>© 2026 <a class="cp-link" href="https://github.com/phpc91/cabureh" target="_blank" rel="noopener">phpc91</a>. Código, textos e análises sob licença
   <a class="cp-link" href="https://creativecommons.org/licenses/by-nc/4.0/deed.pt-br" target="_blank" rel="license noopener">CC BY-NC 4.0</a>:

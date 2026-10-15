@@ -422,6 +422,20 @@ def montar(fonte: Fonte, periodo: Periodo, legislaturas: list[int], nomes_deputa
                 if n:
                     indice[norm(n)].add(s.id)
         sem_dono: Counter = Counter()
+        toks = [(s.id, emendas.tokens(norm(n))) for s in sens.values() for n in s.nomes | {s.nome} if n]
+        achados: dict[str, set[int]] = {}
+
+        def achar(nome: str) -> set[int]:
+            """Nome igual; senão, palavras de um contidas nas do outro (≥2 palavras), com candidato único."""
+            if nome in achados:
+                return achados[nome]
+            n = norm(nome)
+            ids = indice.get(n, set())
+            if not ids:
+                t = emendas.tokens(n)
+                ids = {i for i, d in toks if len(t) >= 2 and len(d) >= 2 and (t <= d or d <= t)}
+            achados[nome] = ids
+            return ids
 
         def registros():
             for ano in anos:
@@ -433,7 +447,7 @@ def montar(fonte: Fonte, periodo: Periodo, legislaturas: list[int], nomes_deputa
                 ini = texto.find('"ANO"')        # a primeira linha traz a data de atualização
                 leitor = csv.DictReader(io.StringIO(texto[max(ini, 0):], newline=""), delimiter=";")
                 for r in leitor:
-                    ids = indice.get(norm(r.get("SENADOR") or ""), set())
+                    ids = achar(r.get("SENADOR") or "")
                     v = emendas.valor(r.get("VALOR_REEMBOLSADO"))
                     if len(ids) != 1:
                         sem_dono[r.get("SENADOR") or ""] += v

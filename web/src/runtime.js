@@ -4,21 +4,26 @@ import * as d3 from 'd3';
 
 const NUMERICOS = /^-?\d+(\.\d+)?$/;
 
-export const FONTES = {
-  presenca: 'data/presenca.csv',
-  pauta: 'data/pauta.csv',
-  partidos_votacao: 'data/partidos-votacao.csv',
-  alinhamento: 'data/alinhamento.csv',
-  gastos_mes: 'data/gastos-mes.csv',
-  gastos_categoria: 'data/gastos-categoria.csv',
-  fornecedores: 'data/fornecedores.csv',
-  emendas: 'data/emendas.csv',
-  emendas_destinos: 'data/emendas-destinos.csv',
-  emendas_mes: 'data/emendas-mes.csv',
-  emendas_favorecidos: 'data/emendas-favorecidos.csv',
-  emendas_tipos: 'data/emendas-tipos.csv',
-  meta: 'data/meta.json',
+// Casa legislativa: ?casa=senado troca a pasta de dados; a Câmara é o padrão.
+export const CASA = new URLSearchParams(location.search).get('casa') === 'senado' ? 'senado' : 'camara';
+const BASE = CASA === 'senado' ? 'data/senado/' : 'data/';
+const ARQUIVOS = {
+  presenca: 'presenca.csv',
+  pauta: 'pauta.csv',
+  partidos_votacao: 'partidos-votacao.csv',
+  alinhamento: 'alinhamento.csv',
+  gastos_mes: 'gastos-mes.csv',
+  gastos_categoria: 'gastos-categoria.csv',
+  fornecedores: 'fornecedores.csv',
+  emendas: 'emendas.csv',
+  emendas_destinos: 'emendas-destinos.csv',
+  emendas_mes: 'emendas-mes.csv',
+  emendas_favorecidos: 'emendas-favorecidos.csv',
+  emendas_tipos: 'emendas-tipos.csv',
+  meta: 'meta.json',
 };
+if (CASA === 'senado') ARQUIVOS.ausencias = 'ausencias.csv';   // motivos das ausências, só no Senado
+export const FONTES = Object.fromEntries(Object.entries(ARQUIVOS).map(([k, v]) => [k, BASE + v]));
 
 const PADRAO = { anos: [], partido: null, uf: null, deputado: null, minimo: 25 };
 
@@ -33,6 +38,7 @@ function lerUrl() {
 
 function escreverUrl(p) {
   const q = new URLSearchParams();
+  if (CASA !== 'camara') q.set('casa', CASA);
   if (p.anos && p.anos.length) q.set('anos', p.anos.join(','));
   for (const k of ['partido', 'uf', 'deputado']) if (p[k] != null && p[k] !== '') q.set(k, p[k]);
   if (p.minimo !== PADRAO.minimo) q.set('minimo', String(p.minimo));
@@ -83,6 +89,7 @@ export function criarRuntime() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) redesenhar(); });
 
   return {
+    casa: CASA,
     colors: [1, 2, 3, 4, 5, 6, 7, 8].map((i) => `var(--series-${i})`),
     data: (id) => ({ ...(estado[id] || { status: 'missing', data: [], columns: [], message: 'fonte desconhecida' }), refreshing: false, meta: [] }),
     onData: (fn) => { desenhos.push(fn); try { fn(); } catch (e) { console.error(e); } },

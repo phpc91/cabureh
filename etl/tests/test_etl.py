@@ -123,6 +123,7 @@ def test_cotas(fonte):
 def test_emendas_auxiliares():
     assert emendas.titular("ANA (EX-PARLAMENTAR BIA, NOS TERMOS DA DECISAO ADPF 854)") == "ANA"
     assert emendas.titular("JOSÉ") == "JOSÉ"
+    assert emendas.nome_autor("DEP. ROSEANA SARNEY") == "ROSEANA SARNEY"
     assert emendas.valor("1.300.000,50") == 1300000.5 and emendas.valor("") == 0
     assert emendas.tipo("Emenda Individual - Transferências Especiais") == "Transferência especial"
     assert emendas.destino("CAMPINAS - SP", "CAMPINAS", "SÃO PAULO") == ("Campinas - SP", "SP")
@@ -202,9 +203,9 @@ def test_senado(fonte):
     assert (al[(10, "2025-02")]["base_governo"], al[(10, "2025-02")]["com_governo"]) == (1, 1)
     assert (11, "2025-02") in al and al[(11, "2025-02")]["com_governo"] == 0
     gm = {(r["id_deputado"], r["mes"]): r["valor"] for r in s.arquivos["gastos-mes.csv"][0]}
-    assert gm == {(10, "2025-02"): 100.5, (11, "2025-03"): 50.0}
+    assert gm == {(10, "2025-02"): 100.5, (10, "2025-03"): 5.0, (11, "2025-03"): 50.0}   # "ANA LIMA" por aproximação
     cats = {r["categoria"] for r in s.arquivos["gastos-categoria.csv"][0]}
-    assert cats == {"Passagens aéreas", "Locomoção, hospedagem e alimentação"}
+    assert cats == {"Passagens aéreas", "Locomoção, hospedagem e alimentação", "Divulgação do mandato"}
     forn = {r["id_deputado"]: r for r in s.arquivos["fornecedores.csv"][0]}
     assert forn[11]["documento"] == "Pessoa física"
     assert "DESCONHECIDO" in s.meta["cotas"]["sem_senador_identificado"]
