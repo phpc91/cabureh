@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ver o painel
+    url: https://phpc91.github.io/cabureh/
+    about: Antes de abrir uma issue, veja se a resposta já está no painel ou na aba "Como ler".

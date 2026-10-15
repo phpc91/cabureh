@@ -1,0 +1,94 @@
+name: Proposta
+description: Uma nova análise, melhoria, correção de número ou problema no site
+title: "[Proposta] "
+labels: ["proposta"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por ajudar! Toda issue nova entra com o rótulo `proposta` e é discutida aqui.
+        Quando estiver clara e fizer sentido para o projeto, recebe o rótulo `aprovada` e pode
+        ser implementada. Quanto mais concreta a proposta, mais rápido isso acontece.
+
+  - type: dropdown
+    id: tipo
+    attributes:
+      label: Tipo
+      options:
+        - Nova análise ou gráfico
+        - Melhoria em algo que já existe
+        - Número errado ou suspeito
+        - Problema no site (não carrega, quebra no celular, etc.)
+        - Nova fonte de dados
+    validations:
+      required: true
+
+  - type: dropdown
+    id: casa
+    attributes:
+      label: Casa
+      options:
+        - Câmara
+        - Senado
+        - As duas
+        - Não se aplica
+    validations:
+      required: true
+
+  - type: textarea
+    id: pergunta
+    attributes:
+      label: O que você quer saber ou o que está errado?
+      description: A pergunta que o painel deveria responder, ou o problema que você encontrou.
+      placeholder: |
+        Ex.: Quero saber quais senadores mais faltaram em votações de PEC.
+        Ex.: A presença do deputado X aparece como 40%, mas ele estava licenciado em 2024.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Proposta
+      description: Como isso deveria aparecer no painel? Em qual aba, com que tipo de gráfico ou tabela, com qual cálculo.
+      placeholder: |
+        Ex.: Na aba Votações, um filtro por tipo de proposição (PEC, PL, MPV) que muda os rankings.
+    validations:
+      required: true
+
+  - type: textarea
+    id: fonte
+    attributes:
+      label: Fonte dos dados
+      description: Link para a API, o arquivo ou a página oficial de onde viriam os dados. Se não souber, tudo bem.
+      placeholder: |
+        Ex.: https://legis.senado.leg.br/dadosabertos/votacao (campo "sigla")
+
+  - type: textarea
+    id: pronto
+    attributes:
+      label: Como saber que ficou pronto
+      description: Critérios que dê para conferir depois de implementado. Para números errados, o valor esperado e onde conferir.
+      placeholder: |
+        - [ ] A aba Votações tem um filtro por tipo de proposição
+        - [ ] Com o filtro em PEC, o ranking "Quem mais votou" muda
+        - [ ] O total de votações de PEC em 2025 bate com o site do Senado
+    validations:
+      required: true
+
+  - type: textarea
+    id: exemplo
+    attributes:
+      label: Link do painel, prints ou exemplos
+      description: O endereço do painel já filtrado ajuda muito, porque guarda ano, partido, estado e parlamentar.
+      placeholder: https://phpc91.github.io/cabureh/?casa=senado&anos=2025#votacoes
+
+  - type: checkboxes
+    id: checagem
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: Procurei nas issues abertas e não encontrei uma igual
+          required: true
+        - label: Li a aba "Como ler" do painel sobre o assunto
+          required: true
