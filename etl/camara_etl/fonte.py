@@ -24,6 +24,7 @@ log = logging.getLogger(__name__)
 BASE_ARQUIVOS = "https://dadosabertos.camara.leg.br/arquivos"
 BASE_API = "https://dadosabertos.camara.leg.br/api/v2"
 URL_COTAS = "https://www.camara.leg.br/cotas/Ano-{ano}.csv.zip"
+URL_EMENDAS = "https://dadosabertos-download.cgu.gov.br/PortalDaTransparencia/saida/emendas-parlamentares/EmendasParlamentares.zip"
 USER_AGENT = "presenca-camara/0.1 (+painel de dados abertos)"
 
 csv.field_size_limit(1 << 30)
@@ -57,6 +58,10 @@ class Fonte:
     def cotas(self, ano: int) -> Path | None:
         """Zip anual da cota parlamentar (CEAP)."""
         return self._baixar(URL_COTAS.format(ano=ano), self.cache / "arquivos" / f"cotas-{ano}.csv.zip")
+
+    def emendas(self) -> Path | None:
+        """Zip único de emendas parlamentares do Portal da Transparência (download aberto, sem chave)."""
+        return self._baixar(URL_EMENDAS, self.cache / "arquivos" / "emendas-parlamentares.zip")
 
     def _baixar(self, url: str, destino: Path) -> Path | None:
         meta_path = destino.with_suffix(destino.suffix + ".meta.json")
@@ -130,6 +135,24 @@ class Fonte:
             return json.loads(arq.read_text())
         raise FonteIndisponivel(chave)
 
+    def json_externo(self, url: str, ttl: float = DIA) -> dict | None:
+        """GET de JSON em outra API pública, com o mesmo cache em disco. None se indisponível."""
+        arq = self.cache / "api" / ("ext-" + hashlib.sha1(url.encode()).hexdigest() + ".json")
+        if arq.exists() and (self.offline or time.time() - arq.stat().st_mtime < ttl):
+            return json.loads(arq.read_text())
+        if not self.offline:
+            for tentativa in range(3):
+                try:
+                    r = self.sessao.get(url, timeout=(15, 60), headers={"Accept": "application/json"})
+                    r.raise_for_status()
+                    dados = r.json()
+                    arq.write_text(json.dumps(dados))
+                    return dados
+                except (requests.RequestException, ValueError) as e:
+                    log.warning("falha em %s (%s)", url, e)
+                    time.sleep(2 * (tentativa + 1))
+        return json.loads(arq.read_text()) if arq.exists() else None
+
     def api_lista(self, caminho: str, params: dict | None = None, ttl: float = DIA) -> list[dict]:
         """Percorre todas as páginas de um recurso paginado."""
         out, pagina = [], 1
@@ -155,23 +178,31 @@ def ler_csv(caminho: Path | None, colunas: list[str]) -> Iterator[tuple[str, ...
         yield from _ler(f, colunas, caminho.name)
 
 
-def ler_csv_zip(caminho: Path | None, colunas: list[str]) -> Iterator[tuple[str, ...]]:
+def ler_csv_zip(caminho: Path | None, colunas: list, membro: str | None = None,
+                encoding: str = "utf-8-sig") -> Iterator[tuple[str, ...]]:
+    """Lê um CSV de dentro de um zip (o primeiro, ou o de nome `membro`)."""
     if caminho is None:
         return
     with zipfile.ZipFile(caminho) as z:
-        nome = next(n for n in z.namelist() if n.lower().endswith(".csv"))
+        nome = membro or next(n for n in z.namelist() if n.lower().endswith(".csv"))
         with z.open(nome) as bruto:
-            f = io.TextIOWrapper(bruto, encoding="utf-8-sig", newline="")
+            f = io.TextIOWrapper(bruto, encoding=encoding, newline="")
             yield from _ler(f, colunas, nome)
 
 
-def _ler(f, colunas: list[str], nome: str) -> Iterator[tuple[str, ...]]:
+def _ler(f, colunas: list, nome: str) -> Iterator[tuple[str, ...]]:
+    """Cada coluna pedida pode ser um nome ou uma tupla de nomes alternativos."""
     leitor = csv.reader(f, delimiter=";")
-    cab = [c.strip() for c in next(leitor)]
-    faltam = [c for c in colunas if c not in cab]
+    cab = [c.strip().lstrip("\ufeff") for c in next(leitor)]
+    idx, faltam = [], []
+    for c in colunas:
+        opcoes = (c,) if isinstance(c, str) else c
+        achou = next((cab.index(o) for o in opcoes if o in cab), None)
+        if achou is None:
+            faltam.append(c)
+        idx.append(achou)
     if faltam:
         raise ValueError(f"{nome}: colunas ausentes {faltam}; colunas do arquivo: {cab}")
-    idx = [cab.index(c) for c in colunas]
     n = len(cab)
     for linha in leitor:
         if not linha or (len(linha) == 1 and not linha[0]):

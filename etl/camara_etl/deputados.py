@@ -32,11 +32,26 @@ class Deputado:
     uf: str
     eventos: list[Evento] = field(default_factory=list)
     _tempos: list[str] = field(default_factory=list, repr=False)
+    nomes: set[str] = field(default_factory=set, repr=False)  # todos os nomes que já usou
 
     def em(self, t: str) -> Evento | None:
         """Último evento com data-hora <= t."""
         i = bisect.bisect_right(self._tempos, t) - 1
         return self.eventos[i] if i >= 0 else None
+
+    def exerceu_entre(self, ini: str, fim: str) -> bool:
+        """Esteve em exercício em algum momento entre ini e fim (datas-hora ISO)."""
+        e = self.em(ini)
+        if e is not None and e.exercicio:
+            return True
+        i = bisect.bisect_right(self._tempos, ini)
+        j = bisect.bisect_right(self._tempos, fim)
+        return any(ev.exercicio for ev in self.eventos[i:j])
+
+    def partido_em(self, t: str) -> str | None:
+        """Partido no instante t; antes do primeiro registro, o primeiro partido conhecido."""
+        e = self.em(t)
+        return (e.partido if e else None) or self.primeiro_partido
 
     @property
     def primeiro_partido(self) -> str | None:
@@ -72,7 +87,8 @@ def montar_deputado(dep_id: int, historico: list[dict]) -> Deputado:
     com_data = sorted((r for r in historico if r.get("dataHora")), key=lambda r: r["dataHora"])
     ultimo = com_data[-1] if com_data else {}
     nome = ultimo.get("nome") or ultimo.get("nomeEleitoral") or ""
-    return Deputado(dep_id, nome, ultimo.get("siglaUf") or "", eventos, [e.t for e in eventos])
+    nomes = {str(r.get(k)) for r in historico for k in ("nome", "nomeEleitoral") if r.get(k)}
+    return Deputado(dep_id, nome, ultimo.get("siglaUf") or "", eventos, [e.t for e in eventos], nomes)
 
 
 def legislaturas_no_periodo(fonte: Fonte, periodo: Periodo) -> list[int]:
@@ -100,6 +116,7 @@ def carregar_deputados(fonte: Fonte, ids: set[int]) -> dict[int, Deputado]:
             st = d.get("ultimoStatus") or {}
             dep.nome = st.get("nome") or d.get("nomeCivil") or f"Deputado {dep_id}"
             dep.uf = st.get("siglaUf") or d.get("ufNascimento") or ""
+            dep.nomes |= {x for x in (st.get("nome"), d.get("nomeCivil")) if x}
         return dep
 
     lista = fonte.em_paralelo(um, sorted(ids))

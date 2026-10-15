@@ -1,6 +1,6 @@
 from datetime import date
 
-from camara_etl import atividade, cotas, pauta
+from camara_etl import atividade, cotas, emendas, pauta
 from camara_etl.carga import carregar_eventos, carregar_projetos, carregar_votacoes, carregar_votos
 from camara_etl.deputados import carregar_deputados, ids_das_legislaturas, legislaturas_no_periodo, montar_deputado, nome_legivel
 from camara_etl.periodo import Periodo, periodo_padrao
@@ -118,3 +118,42 @@ def test_cotas(fonte):
     forn = [r for r in s.fornecedores if r["id_deputado"] == 2]
     assert forn[0]["documento"] == "Pessoa física" and "123" not in forn[0]["documento"]
     assert s.fornecedores[0]["valor"] >= s.fornecedores[1]["valor"]
+
+
+def test_emendas_auxiliares():
+    assert emendas.titular("ANA (EX-PARLAMENTAR BIA, NOS TERMOS DA DECISAO ADPF 854)") == "ANA"
+    assert emendas.titular("JOSÉ") == "JOSÉ"
+    assert emendas.valor("1.300.000,50") == 1300000.5 and emendas.valor("") == 0
+    assert emendas.tipo("Emenda Individual - Transferências Especiais") == "Transferência especial"
+    assert emendas.destino("CAMPINAS - SP", "CAMPINAS", "SÃO PAULO") == ("CAMPINAS - SP", "SP")
+    assert emendas.destino("BAHIA (UF)", "Sem informação", "BAHIA") == ("Bahia (estado)", "BA")
+    assert emendas.destino("Nacional", "", "Sem informação") == ("Nacional", "")
+    assert emendas.documento("***.456.789-**", "Pessoa Fisica") == "Pessoa física"
+    assert emendas.documento("12345678000190", "Pessoa Jurídica") == "12.345.678/0001-90"
+
+
+def test_emendas(fonte):
+    legs, deps, _, _, _ = _rodar(fonte)
+    s = emendas.montar(fonte, PERIODO, deps, legs)
+    por = {(r["id_deputado"], r["area"]): r for r in s.emendas}
+    # Fulano: código contado uma vez (na linha de maior valor), pago inclui restos a pagar
+    assert por[(1, "Saúde")]["emendas"] == 1 and por[(1, "Saúde")]["pago"] == 600 and por[(1, "Saúde")]["uf_destino"] == "SP"
+    assert por[(1, "Educação")]["emendas"] == 0 and por[(1, "Saúde")]["partido"] == "PL"
+    # Beltrana casada de forma aproximada (título "Dr."), transferência especial sem área
+    assert por[(2, "Sem área definida")]["tipo"] == "Transferência especial"
+    # Ciclano herdou a emenda do ex-parlamentar
+    assert por[(3, "Cultura")]["empenhado"] == 400 and por[(3, "Cultura")]["partido"] == "MDB"
+    assert {r["id_deputado"] for r in s.emendas} == {1, 2, 3}
+    r = s.resumo
+    assert r["individuais_de_senadores"] == 700 and r["individuais_sem_autor_identificado"] == 50
+    assert r["autores_casados_aproximado"] == {"DR BELTRANA SOUZA": "Beltrana Souza"}
+    tipos = {(t["ano"], t["tipo"]): t for t in s.tipos}
+    assert tipos[(2025, "Bancada")]["empenhado"] == 5000 and (2024, "Finalidade definida") not in tipos
+    meses = {(m["id_deputado"], m["mes"]): m["valor"] for m in s.meses}
+    assert meses == {(1, "2025-02"): 100, (1, "2025-03"): 50, (2, "2025-03"): 300}
+    fav = [f for f in s.favorecidos if f["id_deputado"] == 1]
+    assert fav[0]["documento"] == "12.345.678/0001-90"
+    pf = next(f for f in fav if f["documento"] == "Pessoa física")
+    assert pf["favorecido"] == "Pessoas físicas (agrupadas)" and "JOAO" not in str(pf)
+    dest = {(d["id_deputado"], d["destino"]) for d in s.destinos}
+    assert (1, "CAMPINAS - SP") in dest and (2, "Bahia (estado)") in dest and (3, "Rio de Janeiro (estado)") in dest

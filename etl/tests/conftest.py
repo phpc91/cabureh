@@ -44,6 +44,16 @@ class FonteFalsa(Fonte):
         p = self.pasta / f"cotas-{ano}.csv.zip"
         return p if p.exists() else None
 
+    def emendas(self):
+        p = self.pasta / "emendas.zip"
+        return p if p.exists() else None
+
+    def json_externo(self, url, ttl=0):
+        if "senador/lista/legislatura/57/57" in url:
+            return {"ListaParlamentarLegislatura": {"Parlamentares": {"Parlamentar": [
+                {"IdentificacaoParlamentar": {"NomeParlamentar": "Alan Rick", "NomeCompletoParlamentar": "Alan Rick Miranda"}}]}}}
+        return None
+
     def api(self, caminho, params=None, ttl=0):
         params = params or {}
         if caminho == "/legislaturas":
@@ -118,4 +128,52 @@ def fonte(tmp_path: Path) -> FonteFalsa:
     ])
     with zipfile.ZipFile(d / "cotas-2025.csv.zip", "w") as z:
         z.writestr("Ano-2025.csv", "﻿" + buf.getvalue())
+    _zip_emendas(d / "emendas.zip")
     return FonteFalsa(d)
+
+
+def _latin1(header, rows):
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_ALL, lineterminator="\r\n")
+    w.writerow(header)
+    w.writerows(rows)
+    return buf.getvalue().encode("latin-1")
+
+
+FD = "Emenda Individual - Transferências com Finalidade Definida"
+TE = "Emenda Individual - Transferências Especiais"
+
+
+def _zip_emendas(path: Path):
+    cab = ["Código da Emenda", "Ano da Emenda", "Tipo de Emenda", "Código do Autor da Emenda", "Nome do Autor da Emenda",
+           "Número da emenda", "Localidade de aplicação do recurso", "Código Município IBGE", "Município", "Código UF IBGE", "UF",
+           "Região", "Código Função", "Nome Função", "Nome Subfunção", "Valor Empenhado", "Valor Liquidado", "Valor Pago",
+           "Valor Restos A Pagar Inscritos", "Valor Restos A Pagar Cancelados", "Valor Restos A Pagar Pagos"]
+
+    def linha(cod, ano, tp, autor, loc, mun, uf, func, emp, pago, rpp):
+        return [cod, ano, tp, cod[4:8], autor, cod[8:], loc, "", mun, "", uf, "", "", func, "", emp, "0,00", pago, "0,00", "0,00", rpp]
+
+    emendas = [
+        linha("202510010001", "2025", FD, "FULANO DE TAL", "CAMPINAS - SP", "CAMPINAS", "SÃO PAULO", "Saúde", "1000,50", "500,00", "100,00"),
+        linha("202510010001", "2025", FD, "FULANO DE TAL", "CAMPINAS - SP", "CAMPINAS", "SÃO PAULO", "Educação", "200,00", "0,00", "0,00"),
+        linha("202510020001", "2025", TE, "DR. BELTRANA SOUZA", "BAHIA (UF)", "Sem informação", "BAHIA", "Encargos especiais", "300,00", "300,00", "0,00"),
+        linha("202510030001", "2025", FD, "ALAN RICK", "Nacional", "", "Sem informação", "Saúde", "700,00", "0,00", "0,00"),
+        linha("202510040001", "2025", FD, "CICLANO (EX-PARLAMENTAR FULANO, NOS TERMOS ART. 78 LDO 2025)", "MÚLTIPLO", "", "RIO DE JANEIRO", "Cultura", "400,00", "0,00", "0,00"),
+        linha("202571240001", "2025", "Emenda de Bancada", "BANCADA DE SAO PAULO", "SÃO PAULO (UF)", "", "SÃO PAULO", "Saúde", "5000,00", "1000,00", "0,00"),
+        linha("202410010009", "2024", FD, "FULANO DE TAL", "Nacional", "", "", "Saúde", "999,00", "0,00", "0,00"),
+        linha("202510050001", "2025", FD, "FULANO", "Nacional", "", "", "Saúde", "50,00", "0,00", "0,00"),
+    ]
+    cab_f = ["Código da Emenda", "Código do Autor da Emenda", "Nome do Autor da Emenda", "Número da emenda", "Tipo de Emenda",
+             "Ano/Mês", "Código do Favorecido", "Favorecido", "Natureza Jurídica", "Tipo Favorecido", "UF Favorecido",
+             "Município Favorecido", "Valor Recebido"]
+    fav = [
+        ["202510010001", "1001", "FULANO DE TAL", "0001", FD, "202502", "12345678000190", "MUNICIPIO DE CAMPINAS", "Município", "Pessoa Jurídica", "SP", "CAMPINAS", "100,00"],
+        ["202510010001", "1001", "FULANO DE TAL", "0001", FD, "202503", "***.456.789-**", "JOAO DA SILVA", "Sem informação", "Pessoa Fisica", "SP", "CAMPINAS", "50,00"],
+        ["202510020001", "1002", "DR. BELTRANA SOUZA", "0001", TE, "202503", "13937073000156", "ESTADO DA BAHIA", "Estado ou Distrito Federal", "Pessoa Jurídica", "BA", "SALVADOR", "300,00"],
+        ["202571240001", "7124", "BANCADA DE SAO PAULO", "0001", "Emenda de Bancada", "202502", "12345678000190", "MUNICIPIO DE CAMPINAS", "Município", "Pessoa Jurídica", "SP", "CAMPINAS", "1000,00"],
+        ["202510010001", "1001", "FULANO DE TAL", "0001", FD, "202504", "12345678000190", "MUNICIPIO DE CAMPINAS", "Município", "Pessoa Jurídica", "SP", "CAMPINAS", "77,00"],
+    ]
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("EmendasParlamentares.csv", _latin1(cab, emendas))
+        z.writestr("EmendasParlamentares_PorFavorecido.csv", _latin1(cab_f, fav))
+        z.writestr("EmendasParlamentares_Convenios.csv", _latin1(["Código da Emenda"], []))

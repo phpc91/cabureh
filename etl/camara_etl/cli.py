@@ -11,10 +11,10 @@ import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from . import atividade, cotas, pauta
+from . import atividade, cotas, emendas, pauta
 from .carga import carregar_eventos, carregar_projetos, carregar_votacoes, carregar_votos
 from .deputados import carregar_deputados, ids_das_legislaturas, legislaturas_no_periodo
-from .fonte import Fonte
+from .fonte import Fonte, FonteIndisponivel
 from .periodo import periodo_padrao
 
 log = logging.getLogger("camara_etl")
@@ -71,6 +71,23 @@ def build(args: argparse.Namespace) -> int:
                      ["id_deputado", "ano", "fornecedor", "documento", "categoria", "valor", "documentos"])
         resumo_cotas = ct.resumo
 
+    resumo_emendas = None
+    if not args.sem_emendas:
+        try:
+            em = emendas.montar(fonte, periodo, deputados, legislaturas)
+            escrever_csv(out / "emendas.csv", em.emendas,
+                         ["id_deputado", "ano", "partido", "tipo", "area", "uf_destino", "emendas", "empenhado", "pago"])
+            escrever_csv(out / "emendas-destinos.csv", em.destinos, ["id_deputado", "ano", "destino", "uf", "empenhado", "pago"])
+            escrever_csv(out / "emendas-mes.csv", em.meses, ["id_deputado", "mes", "partido", "tipo", "valor"])
+            escrever_csv(out / "emendas-favorecidos.csv", em.favorecidos,
+                         ["id_deputado", "ano", "favorecido", "documento", "natureza", "uf", "municipio", "valor", "pagamentos"])
+            escrever_csv(out / "emendas-tipos.csv", em.tipos, ["ano", "tipo", "emendas", "empenhado", "pago"])
+            resumo_emendas = em.resumo
+        except (FonteIndisponivel, FileNotFoundError, ValueError, KeyError) as e:
+            # o Portal fora do ar não deve impedir a atualização do resto do painel
+            log.error("emendas indisponíveis nesta atualização: %s", e)
+            resumo_emendas = {"erro": str(e)}
+
     meta_saida = {
         "gerado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "periodo": {"inicio": periodo.ini, "fim": periodo.fim.isoformat()},
@@ -79,6 +96,7 @@ def build(args: argparse.Namespace) -> int:
         "presenca": ativ.resumo,
         "pauta": pt.resumo,
         "cotas": resumo_cotas,
+        "emendas": resumo_emendas,
         "duracao_s": round(time.time() - inicio_execucao),
     }
     (out / "meta.json").write_text(json.dumps(meta_saida, ensure_ascii=False, indent=1))
@@ -94,6 +112,8 @@ def build(args: argparse.Namespace) -> int:
         problemas.append(f"poucos deputados ({ativ.resumo['deputados']})")
     if resumo_cotas is not None and resumo_cotas["total"] <= 0:
         problemas.append("cota parlamentar sem valores")
+    if resumo_emendas and "erro" not in resumo_emendas and resumo_emendas["deputados"] < 300:
+        problemas.append(f"poucos deputados com emendas ({resumo_emendas['deputados']})")
     if problemas:
         log.error("dados suspeitos, nada será publicado: %s", "; ".join(problemas))
         return 1
@@ -111,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--workers", type=int, default=6, help="chamadas simultâneas à API")
     b.add_argument("--offline", action="store_true", help="usa só o cache, sem rede")
     b.add_argument("--sem-cotas", action="store_true", help="não processa a cota parlamentar")
+    b.add_argument("--sem-emendas", action="store_true", help="não processa as emendas parlamentares")
     b.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
