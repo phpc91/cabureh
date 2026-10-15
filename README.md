@@ -58,3 +58,11 @@ A metodologia de cada número está na aba **Como ler** do painel.
 3. O endereço aparece no resumo da execução, no passo *deploy*.
 
 Projeto independente, sem vínculo com a Câmara dos Deputados.
+
+## Licença
+
+© 2026 phpc91. Código, textos, metodologia e visualizações sob
+[Creative Commons Atribuição-NãoComercial 4.0 (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/deed.pt-br):
+pode copiar e adaptar, dando crédito com link para este repositório e sem uso comercial. Texto completo em [LICENSE](LICENSE).
+
+Os dados de origem são públicos e seguem os termos das fontes: Dados Abertos da Câmara dos Deputados e Portal da Transparência (CGU).

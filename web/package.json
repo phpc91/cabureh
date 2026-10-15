@@ -15,5 +15,7 @@
   },
   "devDependencies": {
     "vite": "5.4.11"
-  }
+  },
+  "license": "CC-BY-NC-4.0",
+  "author": "phpc91"
 }
