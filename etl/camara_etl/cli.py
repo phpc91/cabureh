@@ -6,12 +6,13 @@ import argparse
 import csv
 import json
 import logging
+import shutil
 import sys
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from . import atividade, cotas, emendas, pauta
+from . import atividade, cotas, emendas, pauta, senado
 from .carga import carregar_eventos, carregar_projetos, carregar_votacoes, carregar_votos
 from .deputados import carregar_deputados, ids_das_legislaturas, legislaturas_no_periodo
 from .fonte import Fonte, FonteIndisponivel
@@ -29,6 +30,29 @@ def escrever_csv(caminho: Path, linhas: list[dict], colunas: list[str]) -> None:
         w.writerows(linhas)
     tmp.replace(caminho)
     log.info("escrito %s (%d linhas, %.0f KB)", caminho.name, len(linhas), caminho.stat().st_size / 1024)
+
+
+def construir_senado(args, fonte, periodo, legislaturas, deputados, out: Path) -> dict:
+    """Gera data/senado/. Se algo falhar, o painel da Câmara é publicado mesmo assim."""
+    nomes_dep = {emendas.norm(n) for d in deputados.values() for n in (d.nomes | {d.nome}) if n}
+    tmp = out / ".senado-tmp"
+    try:
+        sn = senado.montar(fonte, periodo, legislaturas, nomes_dep, com_cotas=not args.sem_cotas, com_emendas=not args.sem_emendas)
+    except Exception as e:  # noqa: BLE001
+        log.exception("Senado indisponível nesta atualização")
+        return {"erro": str(e)}
+    if sn.problemas:
+        log.error("dados do Senado suspeitos, não publicados: %s", "; ".join(sn.problemas))
+        return {"erro": "; ".join(sn.problemas)}
+    shutil.rmtree(tmp, ignore_errors=True)
+    for nome, (linhas, colunas) in sn.arquivos.items():
+        escrever_csv(tmp / nome, linhas, colunas)
+    meta = {"gerado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "periodo": {"inicio": periodo.ini, "fim": periodo.fim.isoformat()}, **sn.meta}
+    (tmp / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1))
+    shutil.rmtree(out / "senado", ignore_errors=True)
+    tmp.rename(out / "senado")
+    return {k: sn.meta[k] for k in ("presenca", "ultima_votacao") if k in sn.meta}
 
 
 def build(args: argparse.Namespace) -> int:
@@ -74,7 +98,7 @@ def build(args: argparse.Namespace) -> int:
     resumo_emendas = None
     if not args.sem_emendas:
         try:
-            em = emendas.montar(fonte, periodo, deputados, legislaturas)
+            em = emendas.montar(fonte, periodo, deputados, emendas.carregar_senadores(fonte, legislaturas))
             escrever_csv(out / "emendas.csv", em.emendas,
                          ["id_deputado", "ano", "partido", "tipo", "area", "uf_destino", "emendas", "empenhado", "pago"])
             escrever_csv(out / "emendas-destinos.csv", em.destinos, ["id_deputado", "ano", "destino", "uf", "empenhado", "pago"])
@@ -88,6 +112,10 @@ def build(args: argparse.Namespace) -> int:
             log.error("emendas indisponíveis nesta atualização: %s", e)
             resumo_emendas = {"erro": str(e)}
 
+    resumo_senado = None
+    if not args.sem_senado:
+        resumo_senado = construir_senado(args, fonte, periodo, legislaturas, deputados, out)
+
     meta_saida = {
         "gerado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "periodo": {"inicio": periodo.ini, "fim": periodo.fim.isoformat()},
@@ -97,6 +125,7 @@ def build(args: argparse.Namespace) -> int:
         "pauta": pt.resumo,
         "cotas": resumo_cotas,
         "emendas": resumo_emendas,
+        "senado": resumo_senado,
         "duracao_s": round(time.time() - inicio_execucao),
     }
     (out / "meta.json").write_text(json.dumps(meta_saida, ensure_ascii=False, indent=1))
@@ -131,6 +160,7 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--workers", type=int, default=6, help="chamadas simultâneas à API")
     b.add_argument("--offline", action="store_true", help="usa só o cache, sem rede")
     b.add_argument("--sem-cotas", action="store_true", help="não processa a cota parlamentar")
+    b.add_argument("--sem-senado", action="store_true", help="não gera os dados do Senado")
     b.add_argument("--sem-emendas", action="store_true", help="não processa as emendas parlamentares")
     b.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)

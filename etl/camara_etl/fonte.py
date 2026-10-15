@@ -24,6 +24,8 @@ log = logging.getLogger(__name__)
 BASE_ARQUIVOS = "https://dadosabertos.camara.leg.br/arquivos"
 BASE_API = "https://dadosabertos.camara.leg.br/api/v2"
 URL_COTAS = "https://www.camara.leg.br/cotas/Ano-{ano}.csv.zip"
+BASE_SENADO = "https://legis.senado.leg.br/dadosabertos"
+URL_CEAPS = "https://www.senado.gov.br/transparencia/LAI/verba/despesa_ceaps_{ano}.csv"
 URL_EMENDAS = "https://dadosabertos-download.cgu.gov.br/PortalDaTransparencia/saida/emendas-parlamentares/EmendasParlamentares.zip"
 USER_AGENT = "presenca-camara/0.1 (+painel de dados abertos)"
 
@@ -62,6 +64,38 @@ class Fonte:
     def emendas(self) -> Path | None:
         """Zip único de emendas parlamentares do Portal da Transparência (download aberto, sem chave)."""
         return self._baixar(URL_EMENDAS, self.cache / "arquivos" / "emendas-parlamentares.zip")
+
+    def ceaps(self, ano: int) -> Path | None:
+        """CSV anual da cota dos senadores (CEAPS)."""
+        return self._baixar(URL_CEAPS.format(ano=ano), self.cache / "arquivos" / f"ceaps-{ano}.csv")
+
+    def senado(self, caminho: str, params: dict | None = None, ttl: float = DIA):
+        """GET na API de dados abertos do Senado, com cache em disco. None para 404."""
+        params = params or {}
+        chave = "senado:" + caminho + "?" + "&".join(f"{k}={params[k]}" for k in sorted(params))
+        arq = self.cache / "api" / (hashlib.sha1(chave.encode()).hexdigest() + ".json")
+        if arq.exists() and (self.offline or time.time() - arq.stat().st_mtime < ttl):
+            return json.loads(arq.read_text())
+        if self.offline:
+            raise FonteIndisponivel(chave)
+        for tentativa in range(5):
+            try:
+                r = self.sessao.get(BASE_SENADO + caminho, params=params, timeout=(15, 120),
+                                    headers={"Accept": "application/json"})
+                if r.status_code == 404:
+                    dados = None
+                else:
+                    r.raise_for_status()
+                    dados = r.json()
+                arq.write_text(json.dumps(dados))
+                return dados
+            except (requests.RequestException, ValueError) as e:
+                espera = 3 * (tentativa + 1)
+                log.warning("falha na API do Senado %s (%s); nova tentativa em %ss", chave, e, espera)
+                time.sleep(espera)
+        if arq.exists():
+            return json.loads(arq.read_text())
+        raise FonteIndisponivel(chave)
 
     def _baixar(self, url: str, destino: Path) -> Path | None:
         meta_path = destino.with_suffix(destino.suffix + ".meta.json")

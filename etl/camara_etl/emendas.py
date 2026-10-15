@@ -173,6 +173,7 @@ class Casador:
     """
 
     def __init__(self, deputados: dict[int, Deputado], senadores: set[str] | None):
+        # `deputados`: os parlamentares da casa analisada; `senadores`: nomes da OUTRA casa (homônimos a evitar)
         self.deputados = deputados
         self.senadores = senadores
         self.por_nome: dict[str, list[int]] = defaultdict(list)
@@ -273,11 +274,13 @@ def _partido(dep: Deputado, t: str) -> str:
     return dep.partido_em(t) or "Sem partido"
 
 
-def montar(fonte: Fonte, periodo: Periodo, deputados: dict[int, Deputado], legislaturas: list[int]) -> SaidaEmendas:
+def montar(fonte: Fonte, periodo: Periodo, deputados: dict, outra_casa: set[str] | None) -> SaidaEmendas:
+    """`deputados`: parlamentares da casa analisada (deputados ou senadores, com nome, nomes,
+    exerceu_entre e partido_em); `outra_casa`: nomes normalizados dos parlamentares da outra casa."""
     arq = fonte.emendas()
     if arq is None:
         raise FileNotFoundError("zip de emendas não encontrado")
-    casar = Casador(deputados, carregar_senadores(fonte, legislaturas))
+    casar = Casador(deputados, outra_casa)
     anos = {int(a) for a in periodo.anos}
 
     # 1) emendas: valores acumulados por emenda
@@ -383,8 +386,8 @@ def montar(fonte: Fonte, periodo: Periodo, deputados: dict[int, Deputado], legis
         "linhas_emendas": len(emendas), "linhas_mes": len(meses), "linhas_favorecidos": len(favorecidos),
         "deputados": len({r["id_deputado"] for r in emendas}),
         "individuais_empenhado": round(total_ind, 2),
-        "individuais_de_deputados": round(casado, 2),
-        "individuais_de_senadores": round(de_senadores, 2),
+        "individuais_casados": round(casado, 2),
+        "individuais_da_outra_casa": round(de_senadores, 2),
         "individuais_sem_autor_identificado": round(total_ind - casado - de_senadores, 2),
         "pago_no_periodo": round(sum(r["valor"] for r in meses), 2),
         "pago_no_periodo_sem_autor": round(sem_autor, 2),

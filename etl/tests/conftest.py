@@ -48,6 +48,30 @@ class FonteFalsa(Fonte):
         p = self.pasta / "emendas.zip"
         return p if p.exists() else None
 
+    def ceaps(self, ano):
+        p = self.pasta / f"ceaps-{ano}.csv"
+        return p if p.exists() else None
+
+    def senado(self, caminho, params=None, ttl=0):
+        params = params or {}
+        if caminho == "/votacao":
+            return [v for v in SEN_VOTACOES if params["dataInicio"] <= v["dataSessao"] <= params["dataFim"]]
+        if caminho.startswith("/plenario/votacao/orientacaoBancada/"):
+            return {"votacoes": [{"sequencialVotacao": 101, "orientacoesLideranca": [
+                {"partido": "Governo", "voto": "SIM"}, {"partido": "PT", "voto": "SIM"}, {"partido": "Republica", "voto": "NÃO"},
+                {"partido": "MDB", "voto": "LIVRE"}]}]}
+        if caminho.startswith("/senador/lista/legislatura/"):
+            return {"ListaParlamentarLegislatura": {"Parlamentares": {"Parlamentar": [
+                {"IdentificacaoParlamentar": {"CodigoParlamentar": "10", "NomeParlamentar": "Ana", "NomeCompletoParlamentar": "Ana Souza", "UfParlamentar": "SP"}},
+                {"IdentificacaoParlamentar": {"CodigoParlamentar": "17", "NomeParlamentar": "Hugo", "SiglaPartidoParlamentar": "PP", "UfParlamentar": "PI"}}]}}}
+        if caminho == "/processo":
+            proj = {"id": 1, "identificacao": "PL 7/2025", "dataApresentacao": "2025-02-15", "autoria": "Senadora Ana (PT/SP), Senador Bruno (PL/RJ)"}
+            req = {"id": 2, "identificacao": "RQS 9/2025", "dataApresentacao": "2025-02-15", "autoria": "Senadora Ana (PT/SP)"}
+            return {10: [proj, req], 11: [proj]}.get(params["codigoParlamentarAutor"], [])
+        if caminho == "/votacaoComissao/parlamentar/10" and params["dataInicio"].startswith("2025"):
+            return {"VotacoesComissao": {"Votacoes": {"Votacao": {"DataHoraInicioReuniao": "2025-03-11T10:00:00"}}}}
+        return None
+
     def json_externo(self, url, ttl=0):
         if "senador/lista/legislatura/57/57" in url:
             return {"ListaParlamentarLegislatura": {"Parlamentares": {"Parlamentar": [
@@ -67,6 +91,8 @@ class FonteFalsa(Fonte):
             return {"dados": HISTORICOS.get(int(caminho.split("/")[2]), [])}
         if caminho == "/proposicoes/100/temas":
             return {"dados": [{"tema": "Economia"}, {"tema": "Finanças Públicas e Orçamento"}]}
+        if caminho == "/proposicoes":
+            return {"dados": [{"id": 100}]} if (params.get("siglaTipo"), params.get("numero")) == ("PL", "1") else {"dados": []}
         if caminho.startswith("/proposicoes/"):
             return {"dados": []}
         return None
@@ -129,6 +155,13 @@ def fonte(tmp_path: Path) -> FonteFalsa:
     with zipfile.ZipFile(d / "cotas-2025.csv.zip", "w") as z:
         z.writestr("Ano-2025.csv", "﻿" + buf.getvalue())
     _zip_emendas(d / "emendas.zip")
+    (d / "ceaps-2025.csv").write_bytes((
+        '"ULTIMA ATUALIZACAO";"14/10/2026 02:03"\r\n'
+        '"ANO";"MES";"SENADOR";"TIPO_DESPESA";"CNPJ_CPF";"FORNECEDOR";"DOCUMENTO";"DATA";"DETALHAMENTO";"VALOR_REEMBOLSADO";"COD_DOCUMENTO"\r\n'
+        '"2025";"2";"ANA";"Passagens aéreas, aquáticas e terrestres nacionais";"02.012.862/0001-60";"LATAM";"1";"01/02/2025";"trecho\r\ncom quebra";"100,50";"1"\r\n'
+        '"2025";"3";"BRUNO";"Locomoção, hospedagem, alimentação, combustíveis e lubrificantes";"123.456.789-01";"JOSE";"2";"01/03/2025";"";"50,00";"2"\r\n'
+        '"2025";"3";"DESCONHECIDO";"Divulgação da atividade parlamentar";"11222333000144";"GRAFICA";"3";"01/03/2025";"";"10,00";"3"\r\n'
+    ).encode("latin-1"))
     return FonteFalsa(d)
 
 
@@ -177,3 +210,25 @@ def _zip_emendas(path: Path):
         z.writestr("EmendasParlamentares.csv", _latin1(cab, emendas))
         z.writestr("EmendasParlamentares_PorFavorecido.csv", _latin1(cab_f, fav))
         z.writestr("EmendasParlamentares_Convenios.csv", _latin1(["Código da Emenda"], []))
+
+
+def _v(cod, nome, partido, uf, sig):
+    return {"codigoParlamentar": cod, "nomeParlamentar": nome, "siglaPartidoParlamentar": partido, "siglaUFParlamentar": uf, "siglaVotoParlamentar": sig}
+
+
+ANA, BRUNO, CARLA, DAVI, EVA = (10, "Ana", "PT", "SP"), (11, "Bruno", "REPUBLICANOS", "RJ"), (12, "Carla", "PT", "BA"), (13, "Davi", "PSD", "MG"), (14, "Eva", "PT", "SP")
+SEN_VOTACOES = [
+    {"sequencialVotacao": 50, "codigoSessao": 800, "dataSessao": "2024-11-20", "sigla": "PL", "numero": "9", "ano": 2024, "casaSessao": "SF",
+     "votacaoSecreta": "N", "votos": [_v(*ANA, "Sim"), _v(*BRUNO, "Sim"), _v(16, "Gil", "PL", "GO", "Sim")]},
+    {"sequencialVotacao": 101, "codigoSessao": 900, "dataSessao": "2025-02-10", "sigla": "PL", "numero": "1", "ano": 2025, "codigoMateria": 5001,
+     "identificacao": "PL 1/2025", "ementa": "Dispõe sobre algo.", "descricaoVotacao": "Votação nominal do Projeto de Lei nº 1", "resultadoVotacao": "A",
+     "casaSessao": "SF", "votacaoSecreta": "N", "totalVotosSim": 1, "totalVotosNao": 1, "totalVotosAbstencao": 0,
+     "votos": [_v(*ANA, "Sim"), _v(*BRUNO, "Não"), _v(*CARLA, "AP"), _v(*DAVI, "NCom"), _v(*EVA, "Presidente (art. 51 RISF)")]},
+    {"sequencialVotacao": 102, "codigoSessao": 900, "dataSessao": "2025-02-10", "sigla": "MSF", "numero": "3", "ano": 2025, "codigoMateria": 5002,
+     "identificacao": "MSF 3/2025", "descricaoVotacao": "Votação da indicação", "resultadoVotacao": "A", "casaSessao": "SF", "votacaoSecreta": "S",
+     "totalVotosSim": 2, "totalVotosNao": 0, "totalVotosAbstencao": 0,
+     "votos": [_v(*ANA, "Votou"), _v(*BRUNO, "LS"), _v(*CARLA, "Votou"), _v(*DAVI, "NCom"), _v(*EVA, "P-NRV")]},
+    {"sequencialVotacao": 103, "codigoSessao": 901, "dataSessao": "2025-03-05", "sigla": "PEC", "numero": "2", "ano": 2025, "codigoMateria": 5003,
+     "identificacao": "PEC 2/2025", "descricaoVotacao": "Votação nominal da PEC", "resultadoVotacao": "A", "casaSessao": "SF", "votacaoSecreta": "N",
+     "votos": [_v(*ANA, "Sim"), _v(*BRUNO, "MIS"), _v(*CARLA, "LP"), _v(*DAVI, "Sim"), _v(15, "Fabio", "PL", "AC", "AFO")]},
+]

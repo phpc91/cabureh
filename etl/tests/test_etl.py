@@ -1,6 +1,6 @@
 from datetime import date
 
-from camara_etl import atividade, cotas, emendas, pauta
+from camara_etl import atividade, cotas, emendas, pauta, senado
 from camara_etl.carga import carregar_eventos, carregar_projetos, carregar_votacoes, carregar_votos
 from camara_etl.deputados import carregar_deputados, ids_das_legislaturas, legislaturas_no_periodo, montar_deputado, nome_legivel
 from camara_etl.periodo import Periodo, periodo_padrao
@@ -136,7 +136,7 @@ def test_emendas_auxiliares():
 
 def test_emendas(fonte):
     legs, deps, _, _, _ = _rodar(fonte)
-    s = emendas.montar(fonte, PERIODO, deps, legs)
+    s = emendas.montar(fonte, PERIODO, deps, emendas.carregar_senadores(fonte, legs))
     por = {(r["id_deputado"], r["area"]): r for r in s.emendas}
     # Fulano: código contado uma vez (na linha de maior valor), pago inclui restos a pagar
     assert por[(1, "Saúde")]["emendas"] == 1 and por[(1, "Saúde")]["pago"] == 600 and por[(1, "Saúde")]["uf_destino"] == "SP"
@@ -147,7 +147,7 @@ def test_emendas(fonte):
     assert por[(3, "Cultura")]["empenhado"] == 400 and por[(3, "Cultura")]["partido"] == "MDB"
     assert {r["id_deputado"] for r in s.emendas} == {1, 2, 3}
     r = s.resumo
-    assert r["individuais_de_senadores"] == 700 and r["individuais_sem_autor_identificado"] == 50
+    assert r["individuais_da_outra_casa"] == 700 and r["individuais_sem_autor_identificado"] == 50
     assert r["autores_casados_aproximado"] == {"DR BELTRANA SOUZA": "Beltrana Souza"}
     tipos = {(t["ano"], t["tipo"]): t for t in s.tipos}
     assert tipos[(2025, "Bancada")]["empenhado"] == 5000 and (2024, "Finalidade definida") not in tipos
@@ -177,3 +177,36 @@ def test_casador_homonimos_e_janelas():
     vicentinho = montar_deputado(13, [{"dataHora": "2023-02-01T12:00", "situacao": "Exercício", "descricaoStatus": "Entrada - Posse", "siglaPartido": "PT", "siglaUf": "SP", "nome": "Vicentinho"}])
     c2 = emendas.Casador({13: vicentinho}, set())
     assert c2("VICENTINHO ALVES", 2024) is None   # nome de uma palavra não casa por aproximação
+
+
+def test_senado(fonte):
+    s = senado.montar(fonte, PERIODO, [57], {"FULANO DE TAL", "BELTRANA SOUZA", "CICLANO"})
+    assert not s.problemas or all("poucas" in p or "poucos" in p for p in s.problemas)
+    L = {(r["id_deputado"], r["mes"]): r for r in s.arquivos["presenca.csv"][0]}
+    assert 15 not in {k[0] for k in L} and 16 not in {k[0] for k in L}   # fora do exercício / só antes do período
+    ana_fev, ana_mar = L[(10, "2025-02")], L[(10, "2025-03")]
+    assert (ana_fev["sessoes"], ana_fev["presencas"], ana_fev["votou_sim"], ana_fev["outros_votos"]) == (1, 1, 1, 1)
+    assert ana_fev["projetos_autor"] == 1 and ana_mar["votos_comissoes"] == 1
+    assert L[(11, "2025-02")]["projetos_coautor"] == 1 and L[(11, "2025-02")]["partido"] == "REPUBLICANOS"
+    carla = L[(12, "2025-02")]
+    assert (carla["sessoes"], carla["presencas"], carla["votacoes"]) == (1, 1, 2)      # votou na secreta
+    assert L[(14, "2025-02")]["presencas"] == 1                                         # presidente e presente sem voto
+    aus = {(r["id_deputado"], r["mes"]): r["motivo"] for r in s.arquivos["ausencias.csv"][0]}
+    assert aus == {(13, "2025-02"): "Não compareceu", (11, "2025-03"): "Missão oficial", (12, "2025-03"): "Licença particular"}
+    pauta = {r["id_votacao"]: r for r in s.arquivos["pauta.csv"][0]}
+    assert pauta["101"]["tema"] == "Economia" and pauta["101"]["orient_governo"] == "Sim"
+    assert pauta["102"]["tema"] == "Indicação de autoridades" and pauta["102"]["secreta"] == 1 and pauta["102"]["sim"] == 2
+    pv = {(r["id_votacao"], r["partido"]): r for r in s.arquivos["partidos-votacao.csv"][0]}
+    assert pv[("101", "REPUBLICANOS")]["orientacao"] == "Não" and pv[("101", "PT")]["orientacao"] == "Sim"
+    al = {(r["id_deputado"], r["mes"]): r for r in s.arquivos["alinhamento.csv"][0]}
+    assert (al[(10, "2025-02")]["base_governo"], al[(10, "2025-02")]["com_governo"]) == (1, 1)
+    assert (11, "2025-02") in al and al[(11, "2025-02")]["com_governo"] == 0
+    gm = {(r["id_deputado"], r["mes"]): r["valor"] for r in s.arquivos["gastos-mes.csv"][0]}
+    assert gm == {(10, "2025-02"): 100.5, (11, "2025-03"): 50.0}
+    cats = {r["categoria"] for r in s.arquivos["gastos-categoria.csv"][0]}
+    assert cats == {"Passagens aéreas", "Locomoção, hospedagem e alimentação"}
+    forn = {r["id_deputado"]: r for r in s.arquivos["fornecedores.csv"][0]}
+    assert forn[11]["documento"] == "Pessoa física"
+    assert "DESCONHECIDO" in s.meta["cotas"]["sem_senador_identificado"]
+    assert s.meta["presenca"]["ausencias_por_motivo"] == {"Não compareceu": 1, "Missão oficial": 1, "Licença particular": 1}
+    assert "emendas.csv" in s.arquivos and s.meta["emendas"]["individuais_da_outra_casa"] > 0

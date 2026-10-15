@@ -24,6 +24,7 @@ MAX_FORNECEDORES = 10
 
 # (palavras que precisam aparecer, rótulo) — a primeira regra que casa vence
 CATEGORIAS = [
+    (("locomoc",), "Locomoção, hospedagem e alimentação"),   # categoria agrupada do Senado
     (("passag", "aere"), "Passagens aéreas"),
     (("bilhete", "aere"), "Passagens aéreas"),
     (("passag", "terrestr"), "Passagens terrestres e fluviais"),
@@ -86,39 +87,52 @@ class SaidaCotas:
 
 
 def montar(fonte: Fonte, periodo: Periodo) -> SaidaCotas:
+    ignoradas = 0
+
+    def registros():
+        nonlocal ignoradas
+        for ano in periodo.anos:
+            n = 0
+            for dep, partido, desc, forn, doc, vlr, mes, ano_c in ler_csv_zip(fonte.cotas(ano), COLUNAS):
+                if not dep:  # despesas de lideranças, sem deputado
+                    ignoradas += 1
+                    continue
+                try:
+                    competencia = f"{int(ano_c)}-{int(mes):02d}"
+                except ValueError:
+                    continue
+                n += 1
+                yield int(dep), competencia, partido or "Sem partido", desc, forn, doc, valor(vlr)
+            log.info("cotas %d: %d despesas", ano, n)
+
+    saida = agregar(registros(), periodo)
+    saida.resumo["despesas_de_liderancas_ignoradas"] = ignoradas
+    log.info("cotas: %s", saida.resumo)
+    return saida
+
+
+def agregar(registros, periodo: Periodo) -> SaidaCotas:
+    """Agrega despesas (id, competência AAAA-MM, partido, descrição, fornecedor, CNPJ/CPF, valor)."""
     meses_validos = set(periodo.meses)
     por_mes: dict[tuple, list] = defaultdict(lambda: [0.0, 0])
     por_cat: dict[tuple, float] = defaultdict(float)
     por_forn: dict[tuple, list] = {}
-    ignoradas = 0
-    for ano in periodo.anos:
-        n = 0
-        for dep, partido, desc, forn, doc, vlr, mes, ano_c in ler_csv_zip(fonte.cotas(ano), COLUNAS):
-            if not dep:  # despesas de lideranças, sem deputado
-                ignoradas += 1
-                continue
-            try:
-                competencia = f"{int(ano_c)}-{int(mes):02d}"
-            except ValueError:
-                continue
-            if competencia not in meses_validos:
-                continue
-            v = valor(vlr)
-            dep_i, part, cat = int(dep), partido or "Sem partido", categoria(desc)
-            m = por_mes[(dep_i, competencia, part)]
-            m[0] += v
-            m[1] += 1
-            por_cat[(dep_i, competencia[:4], part, cat)] += v
-            doc_fmt = documento(doc)
-            chave_forn = (dep_i, competencia[:4], doc_fmt if doc_fmt and doc_fmt != "Pessoa física" else "pf:" + (forn or "").strip().upper())
-            f = por_forn.get(chave_forn)
-            if f is None:
-                f = por_forn[chave_forn] = [0.0, 0, (forn or "").strip(), doc_fmt, defaultdict(float)]
-            f[0] += v
-            f[1] += 1
-            f[4][cat] += v
-            n += 1
-        log.info("cotas %d: %d despesas", ano, n)
+    for dep_i, competencia, part, desc, forn, doc, v in registros:
+        if competencia not in meses_validos:
+            continue
+        cat = categoria(desc)
+        m = por_mes[(dep_i, competencia, part)]
+        m[0] += v
+        m[1] += 1
+        por_cat[(dep_i, competencia[:4], part, cat)] += v
+        doc_fmt = documento(doc)
+        chave_forn = (dep_i, competencia[:4], doc_fmt if doc_fmt and doc_fmt != "Pessoa física" else "pf:" + (forn or "").strip().upper())
+        f = por_forn.get(chave_forn)
+        if f is None:
+            f = por_forn[chave_forn] = [0.0, 0, (forn or "").strip(), doc_fmt, defaultdict(float)]
+        f[0] += v
+        f[1] += 1
+        f[4][cat] += v
 
     meses = [{"id_deputado": d, "mes": m, "partido": p, "valor": round(v, 2), "documentos": n}
              for (d, m, p), (v, n) in sorted(por_mes.items())]
@@ -134,6 +148,5 @@ def montar(fonte: Fonte, periodo: Periodo) -> SaidaCotas:
                                  "categoria": cat, "valor": round(v, 2), "documentos": n})
     resumo = {"linhas_mes": len(meses), "linhas_categoria": len(categorias), "linhas_fornecedores": len(fornecedores),
               "total": round(sum(r["valor"] for r in meses), 2), "deputados": len({r["id_deputado"] for r in meses}),
-              "despesas_de_liderancas_ignoradas": ignoradas}
-    log.info("cotas: %s", resumo)
+              }
     return SaidaCotas(meses, categorias, fornecedores, resumo)
