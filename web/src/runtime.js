@@ -44,12 +44,14 @@ export function criarRuntime() {
   const redesenhar = () => {
     if (agendado) return;
     agendado = true;
-    requestAnimationFrame(() => {
+    // setTimeout em vez de requestAnimationFrame: abas carregadas em segundo plano
+    // podem adiar ou descartar quadros, e o painel ficava sem desenhar.
+    setTimeout(() => {
       agendado = false;
       for (const fn of desenhos) {
         try { fn(); } catch (e) { console.error('[painel] erro ao desenhar', e); }
       }
-    });
+    }, 0);
   };
 
   for (const [id, url] of Object.entries(FONTES)) {
@@ -73,6 +75,7 @@ export function criarRuntime() {
     redesenhar();
   });
   window.addEventListener('popstate', () => { params = lerUrl(); redesenhar(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) redesenhar(); });
 
   return {
     colors: [1, 2, 3, 4, 5, 6, 7, 8].map((i) => `var(--series-${i})`),

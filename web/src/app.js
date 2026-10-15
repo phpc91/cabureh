@@ -440,7 +440,8 @@ function paginaGastos(c) {
   legenda('gScatter', recorte ? [{ nome: c.P.partido && c.P.uf ? c.P.partido + ' em ' + c.P.uf : (c.P.partido || c.P.uf), c: C[0] }, { nome: 'Demais deputados', c: MUTED }] : []);
   dispersao(caixa('gScatter'), pontos, c);
   // categorias
-  const porCat = d3.rollups(cg.cat, (rs) => d3.sum(rs, (r) => r.v), (r) => r.cat).sort((a, b) => b[1] - a[1]);
+  // categorias com saldo negativo (estornos, como a complementação do auxílio-moradia) ficam fora das barras
+  const porCat = d3.rollups(cg.cat, (rs) => d3.sum(rs, (r) => r.v), (r) => r.cat).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]);
   const totCat = d3.sum(porCat, (x) => x[1]) || 1;
   barras(caixa('gCat'), porCat.map(([k, v]) => ({ chave: k, rotulo: k, valor: v, texto: reaisC(v) + ' · ' + pct(v / totCat, 0), tip: () => [{ h: k }, { k: 'Valor', v: reais(v) }, { k: 'Do total', v: pct(v / totCat) }] })),
     { cor: C[0], vazio: 'Nenhum gasto registrado com os filtros escolhidos.' });
