@@ -168,7 +168,10 @@ def test_casador_homonimos_e_janelas():
     c = emendas.Casador({10: antigo, 11: novo, 12: herdeiro}, {"ALAN RICK"})
     assert c("ATILA LIRA", 2023) == 10       # apresentada no fim de 2022, pelo mandato antigo
     assert c("ATILA LIRA", 2024) == 11
-    # herdou em novembro do ano da emenda: só a janela larga encontra; nome de uma palavra após o título
+    # herdou em novembro do ano da emenda: só a janela larga encontra (nome via APELIDOS)
     assert c("MARCIVANIA FLEXA (EX-PARLAMENTAR MARIA GORETH, NOS TERMOS ART. 78 LDO 2025)", 2025) == 12
     assert c("MARCIVANIA FLEXA", 2023) is None
     assert c("ALAN RICK", 2025) is None
+    vicentinho = montar_deputado(13, [{"dataHora": "2023-02-01T12:00", "situacao": "Exercício", "descricaoStatus": "Entrada - Posse", "siglaPartido": "PT", "siglaUf": "SP", "nome": "Vicentinho"}])
+    c2 = emendas.Casador({13: vicentinho}, set())
+    assert c2("VICENTINHO ALVES", 2024) is None   # nome de uma palavra não casa por aproximação

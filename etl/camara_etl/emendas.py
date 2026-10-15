@@ -76,6 +76,10 @@ TITULOS = {
     "PADRE", "IRMAO", "IRMA", "DEPUTADO", "DEPUTADA", "JUNIOR", "JR", "FILHO", "NETO", "SOBRINHO",
     "DE", "DA", "DO", "DAS", "DOS", "E",
 }
+# Nome no SIAFI -> nome usado na Câmara, para casos que a comparação aproximada não resolve
+APELIDOS = {
+    "MARCIVANIA FLEXA": "PROFESSORA MARCIVANIA",
+}
 EX_PARLAMENTAR = re.compile(r"^(.*?)\s*\(\s*EX-?\s*PARLAMENTAR\b", re.I)
 
 
@@ -157,8 +161,8 @@ class Casador:
     1. nome igual (sem acentos e pontuação) a algum nome que o deputado usou;
     2. se não houver, comparação aproximada: um nome contido no outro, ignorando títulos como
        Dr. e Pastor e sufixos como Júnior, com candidato único e autor que não seja homônimo de
-       senador. Nomes de uma palavra só casam se ela tiver 6 letras ou mais e for a primeira ou a
-       última do nome do autor.
+       senador, exigindo pelo menos duas palavras dos dois lados (nomes de uma palavra só, como
+       "Vicentinho", casariam com pessoas diferentes). Os poucos casos assim estão em APELIDOS.
     """
 
     def __init__(self, deputados: dict[int, Deputado], senadores: set[str] | None):
@@ -185,20 +189,15 @@ class Casador:
         return self.deputados[dep_id].exerceu_entre(f"{ano - 1}-07-01T00:00:00", f"{ano}-12-31T23:59:59")
 
     @staticmethod
-    def _parecido(autor: str, t: frozenset[str], d: frozenset[str]) -> bool:
-        if len(d) >= 2 and len(t) >= 2:
-            return t <= d or d <= t
-        if len(d) == 1 and len(t) >= 2:
-            (u,) = d
-            partes = [p for p in autor.split() if p not in TITULOS]
-            return len(u) >= 6 and bool(partes) and u in (partes[0], partes[-1])
-        return False
+    def _parecido(t: frozenset[str], d: frozenset[str]) -> bool:
+        return len(d) >= 2 and len(t) >= 2 and (t <= d or d <= t)
 
     def __call__(self, nome_autor: str, ano: int) -> int | None:
         chave = (nome_autor, ano)
         if chave in self.cache:
             return self.cache[chave]
         n = norm(titular(nome_autor))
+        n = APELIDOS.get(n, n)
         achado = None
         homonimos = self.por_nome.get(n, [])
         for estreito in (True, False):
@@ -212,7 +211,7 @@ class Casador:
                 break
         if achado is None and not homonimos and self.senadores is not None and n not in self.senadores:
             t = tokens(n)
-            cands_todos = {i for i, ts in self.toks.items() if any(self._parecido(n, t, d) for d in ts)}
+            cands_todos = {i for i, ts in self.toks.items() if any(self._parecido(t, d) for d in ts)}
             for estreito in (True, False):
                 cands = {i for i in cands_todos if self._ativo(i, ano, estreito)}
                 if len(cands) == 1:
@@ -227,7 +226,7 @@ class Casador:
 
     def anotar_falha(self, nome_autor: str, v: float) -> None:
         n = norm(titular(nome_autor))
-        if self.senadores is not None and n in self.senadores and not self.por_nome.get(n):
+        if self.senadores is not None and n in self.senadores:
             self.de_senadores[n] += v
         else:
             self.nao_casados[titular(nome_autor)] += v
